@@ -1,7 +1,8 @@
 module ParticleInCell
 
-using ..Architectures: StateTypeL1, AbstractBoundary
+using ..Architectures: StateTypeL1, AbstractBoundary, StateTypeL1_1D
 using Statistics
+using LinearAlgebra
 
 using SharedArrays
 using StaticArrays
@@ -272,7 +273,27 @@ end
 #     return grid_point
 # end
 
-# V0: 1D version
+function merge!_1d(grid_point::Vector{Float64}, charge::Vector{Float64}; verbose=false)
+
+    verbose ? (@info "grid_point = $grid_point, charge = $charge") : nothing
+
+    m_grid = grid_point[2]
+    m_charge = charge[2]
+    if (sign(m_grid) == sign(m_charge)) | (m_grid == 0)
+        verbose ? (@info "add, same sign, or grid is zero") : nothing
+        grid_point += charge
+    elseif (sign(m_grid) != sign(m_charge)) & (sign(m_grid) * m_grid > sign(m_charge) * m_charge)
+        verbose ? (@info "forget charge, State is larger") : nothing
+
+    elseif (sign(m_grid) != sign(m_charge)) & (sign(m_grid) * m_grid <= sign(m_charge) * m_charge)
+        verbose ? (@info "overwrite, charge is >=, but sign is different") : nothing
+        grid_point = charge
+    end
+    return grid_point
+
+end
+
+# V0: 1D version --- depreciated 
 function merge!(grid_point::Float64, charge::Float64; verbose=false)
 
     verbose ? (@info "grid_point = $grid_point, charge = $charge") : nothing
@@ -559,12 +580,12 @@ end
 
 
 # multiple index positions and 1 charge
-function push_to_grid!(grid::MM,
+function push_to_grid!(grid::StateTypeL1_1D,
                             charge::CC,
                             index_pos::Vector{Int},
                             weights::Vector{Float64},
                             Nx::Int,
-                            periodic::Bool=true) where {MM<:Union{SharedArray{Float64},Matrix{Float64}} , CC<:Union{Vector{Float64},SVector{Float64}}}
+                            periodic::Bool=true) where {CC<:Union{Vector{Float64},SVector{Float64}}}
     #@info "this is version B"
     if periodic
         for (im, wm) in zip(index_pos, weights)
@@ -572,7 +593,7 @@ function push_to_grid!(grid::MM,
             # old version
             #grid[wrap_index!(im, Nx), :] += wm * charge
             # merge rule version
-            grid[wrap_index!(im, Nx), :] = merge!(grid[wrap_index!(im, Nx), :], wm * charge)
+            grid[wrap_index!(im, Nx), :] = merge!_1d(grid[wrap_index!(im, Nx), :], wm * charge)
         end
     else
         for (im, wm) in zip(index_pos, weights)
@@ -581,7 +602,7 @@ function push_to_grid!(grid::MM,
                 #grid[im, : ] += wm * charge
 
                 # merge rule version
-                grid[im, :] = merge!(grid[im, :], wm * charge)
+                grid[im, :] = merge!_1d(grid[im, :], wm * charge)
                 #grid[im, :] = grid[im, :] ⊓ wm * charge
             end
         end

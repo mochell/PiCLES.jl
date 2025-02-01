@@ -585,7 +585,9 @@ function particle_equations(u_wind; γ::Number=0.88, q::Number=-1 / 4.0, IDConst
     propagation=true,
     input=true,
     dissipation=true,
-    peak_shift=true, info=false)
+    peak_shift=true, info=false, 
+    debug_output=false,
+    )
 
     #t, x, c̄_x, lne, r_g, C_α, g, C_e = init_vars_1D()
 
@@ -593,62 +595,74 @@ function particle_equations(u_wind; γ::Number=0.88, q::Number=-1 / 4.0, IDConst
     p, q, n = magic_fractions(q)
     e_T = e_T_func(γ, p, q, n, c_β=IDConstants.c_β, c_D=IDConstants.c_D, c_e=IDConstants.c_e, c_α=IDConstants.c_alpha)
 
-    ###  ---------------- start function here
-    function partice_system(dz, z, params, t) #<: Vector{Number}
-        #unpack0
-        lne, c̄_x, x      = z
-        #lne, c̄_x, x      = z.lne, z.c̄_x, z.x
-        r_g, C_α, C_e = params.r_g, params.C_α, params.C_e
+    function particle_system(dz, z, params, t)#::MVector{5, Number}
 
-        # forcing fields, need to be global scope? 
-        u = u_wind(x, t)
-        #u = (u=u2(x, y, t), v=v2(x, y, t))
+            # forcing fields
+            #u = (u=u(x, y, t), v=v(x, y, t))::NamedTuple{(:u, :v),Tuple{Number,Number}}
+            lne, c̄_x, x = z
 
-        # trig-values # we only use scalers, not vectors
-        c̄ = c̄_x
-        u_speed = abs(u)
+            r_g, C_α, C_e = params.r_g, params.C_α, params.C_e
 
-        # peak parameters
-        c_gp_speed, kₚ, ωₚ = c_g_conversions_vector(abs(c̄), r_g=r_g)
+            # add projection matrix
+            x_lat = haskey(params, :x) ? params.x : x  # latitude in degrees of the Particle instance
 
-        # direction equations
-        α = α_func(u_speed, c_gp_speed)
-        Hₚ = H_β(α, p)
-        Δₚ = Δ_β(α)
+            #u = (u=u, v=v)::NamedTuple{(:u, :v),Tuple{Number,Number}}
+            u                 = u_wind(x_lat, t)#::Number
 
-        # Source terms
-        Ĩ = input ? Ĩ_func(α, Hₚ, C_e) : 0.0
-        D̃ = dissipation ? D̃_func_lne(lne, kₚ, e_T, n) : 0.0
-        S_cg_tilde = peak_shift ? S_cg(lne, Δₚ, kₚ, C_α) : 0.0
-        c_group_x = propagation ? c̄_x : 0.0
-        # no directional changes  in 1D!
-        if info
-            println("alpha = ", α)
-            println("Hₚ = ", Hₚ)
-            println("Δₚ = ", Δₚ)
-            println("I_tilde = ", Ĩ)
-            println("D_tilde = ", D̃)
-            println("S_cg_tilde = ", S_cg_tilde)
-            println("c_tilde_x = ", c_group_x)
+            # @info "x_lat: $x_lat, y_lat: $y_lat"
+            # @info "x_lat: $(round(x_lat, digits=2)), y_lat: $(round(y_lat, digits=2)), u: $(round(u, digits=2)), v: $(round(v, digits=2))"
+            
+            c̄                 = c̄_x
+            u_speed           = abs(u)
+
+            # peak parameters
+            c_gp_speed, kₚ, ωₚ = c_g_conversions_vector(abs(c̄), r_g=r_g) 
+
+            # direction equations
+            α = α_func(u_speed, c_gp_speed)
+            Hₚ = H_β(α, p)
+            Δₚ = Δ_β(α) ## <--- this one is slow!!
+
+            # Source terms
+            Ĩ           = input ? Ĩ_func(α, Hₚ, C_e) : 0.0
+            D̃           = dissipation ? D̃_func_lne(lne, kₚ, e_T, n) : 0.0
+            S_cg_tilde = peak_shift ? S_cg(lne, Δₚ, kₚ, C_α) : 0.0
+            c_group_x = propagation ? c̄_x : 0.0
+            
+            # energy
+            dz[1] = +ωₚ .* r_g .* S_cg_tilde + ωₚ .* (Ĩ - D̃) #- c̄ .* G_n,
+
+            # peak group velocity vector
+            dz[2] = -c̄_x .* ωₚ .* r_g .* S_cg_tilde
+            # dz[3] = 0
+
+            # D(c̄_x) ~ -c̄_x .* ωₚ .* r_g .* S_cg_tilde + (c̄_y + 0.001) .* S_dir_tilde, #* (-1),
+            # D(c̄_y) ~ -c̄_y .* ωₚ .* r_g .* S_cg_tilde - (c̄_x  + 0.001) .* S_dir_tilde, #* (1),
+
+            # propagation
+            dz[3] = c_group_x
+            # dz[5] = 0
+            # dz[5] = propagation ? c̄_y : 0.0
+
+            if debug_output
+                additional_output = [
+                    Ĩ,
+                    -D̃,
+                    r_g * S_cg_tilde,
+                    #alpha_p ~ αₚ(u, c_gp_x, c_gp_y),
+                    Hₚ,
+                    #alpha ~ α,
+                    Δₚ,
+                    c_group_x]
+                append!(dz, additional_output)
+            end
+
+            return dz
+
         end
 
-        # energy
-        dz[1] = +ωₚ .* r_g .* S_cg_tilde + ωₚ .* (Ĩ - D̃)  #- c̄ .* G_n,
-        # dz[1] = +0.5 * 9.81 * c̄_x^(-1) .* r_g .* S_cg_tilde + ωₚ .* (Ĩ - D̃) #- e^3 *ξ / c̄ ,
-        #e * ωₚ .* (Ĩ -  D̃)- e^3 *ξ / c̄ ,
 
-        # peak group velocity vector
-        dz[2] = - c̄_x .* ωₚ .* r_g .* S_cg_tilde
-        # dz[2] = - 0.5 * 9.81 .* r_g .* S_cg_tilde
-            
-        # propagation
-        dz[3] = c_group_x
-
-        return dz
-
-    end
-
-    return partice_system
+    return particle_system
 end
 
 
@@ -666,7 +680,7 @@ function particle_rays(info=false)
         println("c_x = ", c̄_x)
     end
     #D = Differential(t)
-    function partice_system(dz, z, params, t) #<: Vector{Number}
+    function particle_system(dz, z, params, t) #<: Vector{Number}
         lne, c̄_x, x = z
         # energy
         dz[1] = 0
@@ -676,7 +690,7 @@ function particle_rays(info=false)
         dz[3] = c̄_x
     end
 
-    return partice_system
+    return particle_system
 end
 
 

@@ -107,7 +107,7 @@ function WaveGrowth1D(; grid::OneDGrid, winds, ODEsys,
 
     # initialize state {SharedArray} given grid and layers
     # Number of state variables 
-    Nstate = 3
+    Nstate = 2
     if layers > 1
         State = SharedArray{Float64,3}(grid.Nx, Nstate, layers)
     else

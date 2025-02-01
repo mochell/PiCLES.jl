@@ -108,7 +108,7 @@ function GetParticleEnergyMomentum(u_particle::Vector{Float64})
     m_x = ui_e / ui_c̄_x / 2.0
     #m_y = ui_c̄_y * ui_e  / c_speed^2 / 2
 
-    return [ui_e, m_x, 0]
+    return [ui_e, m_x]
 end
 
 
@@ -121,7 +121,7 @@ i_State: [e, m_x, m_y] state vector at node
 x: coordinates of the vertex
 """
 function GetVariablesAtVertex(i_State::Vector{Float64}, x::Float64)
-    e, m_x, m_y = i_State
+    e, m_x = i_State
     #m_amp = particle_waves_v3.speed(m_x, m_y)
     c_x = e / 2.0 / m_x
     #c_y = m_y * e / (2  * m_amp^2)

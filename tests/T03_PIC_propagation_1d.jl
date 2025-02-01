@@ -1,3 +1,8 @@
+# %%
+ENV["JULIA_INCREMENTAL_COMPILE"] = true
+using Pkg
+Pkg.activate("PiCLES/")
+
 using Plots
 using BenchmarkTools
 using Revise
@@ -26,7 +31,13 @@ import Oceananigans: fields
 using Oceananigans.Units
 
 using PiCLES.Operators.core_1D: GetParticleEnergyMomentum, init_z0_to_State! 
-# %
+
+using PiCLES.Architectures: StateTypeL1_1D
+
+# %%
+
+Revise.retry()
+
 # Default values
 save_path_base = "data/1D_gaussian/"
 plot_path_base = "plots/tests/T03_PIC_propagation-1d/with_merging_rules/"
@@ -43,12 +54,8 @@ DT = Float64(20 * 60) # seconds
 Nx = 40
 dt_ODE_save = 10 # 3 min
 
-r_g0 = 0.85
-# function to define constants for grouwth and dissipation
 
-#
-Const_Scg = PW.get_Scg_constants()
-
+ODEpars, Const_ID, Const_Scg = PW.ODEParameters(r_g=0.85)
 
 grid1d = OneDGrid(1e3, Lx - 1e3, Nx)
 # create ID and save name
@@ -78,20 +85,20 @@ Revise.revise(ParticleInCell)
 Revise.retry()
 ############ try v3 again first and check ways to import module
 #particle_equations = PW.particle_equations(u, γ=γ,input=true, dissipation=true, peak_shift=true )
-particle_system = PW.particle_rays()
-
-# define variables based on particle equation
-#t, x, c̄_x, lne, r_g, C_α, g, C_e = nothing
-
-default_ODE_parameters = (r_g =r_g0, C_α = Const_Scg.C_alpha, C_e = Const_ID.C_e)
-
+# particle_system = PW.particle_rays()
+particle_system = PW.particle_equations(u, γ=Const_ID.γ, q=Const_ID.q,
+    propagation=true,
+    input=false,
+    dissipation=false,
+    peak_shift=false,
+);
 
 WindSeamin = FetchRelations.MinimalWindsea(U10, DT)
 particle_defaults = ParticleDefaults(log(WindSeamin["E"]), WindSeamin["cg_bar"], 0.0)
 #particle_defaults = ParticleDefaults(log(FetchRelations.Eⱼ(5.0, DT)), 1e-4, 0.0)
 
 ODE_settings = PW.ODESettings(
-    Parameters=default_ODE_parameters,
+    Parameters=ODEpars,
     # define mininum energy threshold
     log_energy_minimum=log(WindSeamin["E"]),
     #maximum energy threshold
@@ -116,9 +123,6 @@ wave_model = WaveGrowthModels1D.WaveGrowth1D(; grid=grid1d,
     periodic_boundary=false,
     boundary_type="same"
 )
-
-
-
 
 function convert_state_store_to_array(store::Vector{Any})
     store_data = cat(store..., dims=3)
@@ -149,6 +153,7 @@ end
 wave_simulation = Simulation(wave_model, Δt=20minutes, stop_time=24hours)
 initialize_simulation!(wave_simulation)
 
+
 WindSea2 = FetchRelations.get_initial_windsea(U10, 3hours)
 cg_bar = round(WindSea2["cg_bar"])
 cg_bar_min = sign(WindSeamin["cg_bar"])
@@ -161,6 +166,7 @@ for i in range(10, Integer(floor(length(wave_model.ParticleCollection) * 1 / 2))
     init_z0_to_State!(wave_model.State, i, GetParticleEnergyMomentum(ui))
     @info i, wave_model.ParticleCollection[i].ODEIntegrator.u
 end
+
 
 run!(wave_simulation, store=false, cash_store=true, debug=false)
 
@@ -217,6 +223,9 @@ wave_model = WaveGrowthModels1D.WaveGrowth1D(; grid=grid1d,
     periodic_boundary=false,
     boundary_type="same"
 )
+
+
+wave_model.State
 
 wave_simulation = Simulation(wave_model, Δt=20minutes, stop_time=24hours)
 initialize_simulation!(wave_simulation)

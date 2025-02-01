@@ -4,7 +4,7 @@ using SharedArrays
 using StaticArrays
 
 
-export AbstractGrid, AbstractODESettings, AbstractParticleInstance, AbstractMarkedParticleInstance, Abstract1DModel, Abstract2DModel, AbstractModel, AbstractStore, AbstractParticleSystem, StateTypeL1, IDConstantsInstance, ScgConstantsInstance, CartesianGrid, CartesianGrid1D, CartesianGrid2D, TripolarGrid, Grid2D, MeshGrids, MeshGridStatistics
+export AbstractGrid, AbstractODESettings, AbstractParticleInstance, AbstractMarkedParticleInstance, Abstract1DModel, Abstract2DModel, AbstractModel, AbstractStore, AbstractParticleSystem, StateTypeL1, StateTypeL1_1D, IDConstantsInstance, ScgConstantsInstance, CartesianGrid, CartesianGrid1D, CartesianGrid2D, TripolarGrid, Grid2D, MeshGrids, MeshGridStatistics
 
 export StandardRegular1D_old, StandardRegular2D_old
 
@@ -54,8 +54,10 @@ abstract type AbstractModel{TS} end
 abstract type Abstract1DModel <: AbstractModel{Nothing} end
 abstract type Abstract2DModel <: AbstractModel{Nothing} end
 
-#All posiible types of a single-layer StateVectors
+#All possible types of a single-layer StateVectors in 2D
 StateTypeL1 = Union{SharedArray{Float64,3},MArray}
+
+StateTypeL1_1D = Union{SharedArray{Float64,2}}
 
 abstract type AbstractStore end
 
