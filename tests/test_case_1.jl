@@ -111,7 +111,7 @@ wave_model = GeometricalOpticsModels.GeometricalOptics(; grid=grid,
                              0 1e-50 0 0;
                              0 0 1e-50 0
                              0 0 0 1e-50],
-    n_particles_launch=150000
+    n_particles_launch=1500
     )
 
 wave_simulation = Simulation(wave_model, Δt=0.75minutes, stop_time=60minutes)

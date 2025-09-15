@@ -1,7 +1,7 @@
 # %%
 # ENV["JULIA_INCREMENTAL_COMPILE"] = true
 using Pkg
-Pkg.activate(".")
+Pkg.activate("PiCLES/")
 
 import Plots as plt
 using Setfield, IfElse
