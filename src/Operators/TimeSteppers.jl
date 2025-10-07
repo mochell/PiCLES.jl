@@ -229,40 +229,10 @@ function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, deb
     elseif model.angular_spreading_type == "nonparametric"
 
         # This next part needs to change
-        
-        """
-        i=1
-        particlesToBeReset = []
-        particlesToBeResetIndex = []
-        
-        for _ in 1:length(model.ParticleCollection)
-            pos_ij = model.ParticleCollection[i].position_ij
-            big_enough = model.State[pos_ij[1], pos_ij[2],2]^2+model.State[pos_ij[1], pos_ij[2],3]^2>model.minimal_state[2]
-            if model.ParticleCollection[i].boundary || ~big_enough
-                i=i+1
-            else
-                if !(model.ParticleCollection[i].position_ij in particlesToBeResetIndex)
-                    push!(particlesToBeResetIndex, model.ParticleCollection[i].position_ij)
-                end
-                deleteat!(model.ParticleCollection, i)
-            end
-        end
-        """
-        
-        """
-        @threads for a_particle in model.ParticleCollection
-            mapping_2D.remesh!(a_particle, model.State, 
-                            model.winds, model.clock.time, 
-                            model.ODEsettings, Δt,
-                            model.minimal_particle, 
-                            model.minimal_state,
-                            model.ODEdefaults)
-        end
-        """
-        
+
         nPreviousParticles = 0
         model.ParticlePool = []
-        
+
         @threads for (i,j) in [(i,j) for i in 1:model.grid.Nx for j in 1:model.grid.Ny]
             locallen = length(model.ParticlesAtNode[i][j])
             nPreviousParticles += locallen
@@ -272,7 +242,7 @@ function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, deb
                 # newodeint=init(model.ParticlesAtNode[i][j][k][3].ODEIntegrator.t,[deepcopy(model.ParticlesAtNode[i][j][k][3].ODEIntegrator.u[1]), deepcopy(model.ParticlesAtNode[i][j][k][3].ODEIntegrator.u[2]), deepcopy(model.ParticlesAtNode[i][j][k][3].ODEIntegrator.u[3]), deepcopy(model.ParticlesAtNode[i][j][k][3].ODEIntegrator.u[4]), deepcopy(model.ParticlesAtNode[i][j][k][3].ODEIntegrator.u[5]), deepcopy(model.ParticlesAtNode[i][j][k][3].ODEIntegrator.u[6])])
                 # println(newodeint)
                 # println()
-                
+
                 z_init = ParticleDefaults(Upart[1],Upart[2],Upart[3],Upart[4],Upart[5],Upart[6])
                 newpart=InitParticleInstance(model.ODEsystem,z_init,model.ODEsettings,(i,j),false,true)
                 push!(model.ParticlePool, [newpart, i, j, exp(model.ParticlesAtNode[i][j][k][3].ODEIntegrator.u[1])*model.ParticlesAtNode[i][j][k][1]])
@@ -293,7 +263,7 @@ function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, deb
         particlesDrawn = rand(a, nNewParticles)
         #new_energy_tot = sum([energiesNormed[k] for k in particlesDrawn])
         #energy_factor = totEnergyDomain[1] / new_energy_tot
-        
+
         i = 1
         j = 0
         counter = 0
