@@ -45,7 +45,6 @@ mutable struct GeometricalOptics{Grid<:AbstractGrid,
                         Pan,
                         PCollection,
                         PPool,
-                        PtSrcList,
                         FPC,
                         Ovar,
                         Osys,
@@ -77,7 +76,6 @@ mutable struct GeometricalOptics{Grid<:AbstractGrid,
     ParticlesAtNode::Pan      # list of the particles to regrid at each node
     ParticleCollection::PCollection    # Collection (list) of Particles
     ParticlePool::PPool                 # Pool of particles (used for non parametric mode)
-    PointSourceList::PtSrcList          # List of all the point sources of waves
     FailedCollection::FPC      # Collection (list) of Particles that failed to integrate
 
     ODEvars::Ovar     # list of variables in ODE system, have type Num from OrdinaryDiffEq and ModelingToolkit
@@ -199,7 +197,6 @@ function GeometricalOptics(; grid::TwoDGrid,
         end
         ParticlePool = Array{Any,1}()
     end
-    PointSourceList = []
 
     if ODEinit_type isa ParticleDefaults2D
         ODEdefaults = ODEinit_type
@@ -281,7 +278,6 @@ function GeometricalOptics(; grid::TwoDGrid,
         ParticlesAtNode,
         ParticleCollection,
         ParticlePool,
-        PointSourceList,
         FailedCollection, 
         ODEvars,
         ODEsys,
