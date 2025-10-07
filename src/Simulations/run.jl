@@ -222,15 +222,6 @@ function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
 
 end
 
-function initialize_wave_sources!(sim::Simulation, list::Array{Any,1})
-        if sim.verbose
-                @info "init particle sources..."
-        end
-
-        sim.model.PointSourceList = list
-
-        nothing
-end
 
 """
 initialize_simulation!(sim::Simulation)
@@ -442,31 +433,6 @@ function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::
                                                 model.ODEsettings,gridnotes, model.winds,
                                                 model.ODEsettings.timestep, model.boundary,
                                                 model.periodic_boundary))
-                end
-        end
-
-        if length(model.PointSourceList) != 0
-                @info "launching cyclic point source particles"
-                for k in 1:length(model.PointSourceList)
-                        if model.PointSourceList[k].firstTimeLaunched != 0.0
-                                i = Int64(floor((model.PointSourceList[k].particleLaunch.x - model.grid.xmin) / model.grid.dx)) + 1
-                                j = Int64(floor((model.PointSourceList[k].particleLaunch.y - model.grid.ymin) / model.grid.dy)) + 1
-                                n_part = model.n_particles_launch
-                                for _ in 1:n_part
-                                        defaults_temp = deepcopy(model.PointSourceList[k].particleLaunch)
-                                        delta_phi = rand() * defaults_temp.angular_σ - 0.5*defaults_temp.angular_σ
-                                        c_x = defaults_temp.c̄_x * cos(delta_phi) - defaults_temp.c̄_y * sin(delta_phi)
-                                        c_y = defaults_temp.c̄_x * sin(delta_phi) + defaults_temp.c̄_y * cos(delta_phi)
-                                        defaults_temp.lne += -log(n_part)
-                                        defaults_temp.c̄_x = c_x
-                                        defaults_temp.c̄_y = c_y
-                                        push!(ParticleCollection, SeedParticle(model.State,
-                                                        (i,j), model.ODEsystem, defaults_temp,
-                                                        model.ODEsettings,gridnotes, model.winds,
-                                                        model.ODEsettings.timestep, model.boundary,
-                                                        model.periodic_boundary))
-                                end
-                        end
                 end
         end
         nothing
