@@ -15,11 +15,9 @@ using ...custom_structures: ParticleInstance1D, ParticleInstance2D, MarkedPartic
 
 using ..core_2D_spread: GetParticleEnergyMomentum, GetVariablesAtVertex, Get_u_FromShared, ResetParticleValues, ParticleDefaults, InitParticleInstance
 
-using ...Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance, AbstractODESettings, StateTypeL1
+using ...Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance, AbstractODESettings, StateTypeL1, Abstract2DModel
 using ...Architectures: Grid2D, CartesianGrid, CartesianGridStatistics, CartesianGrid2D, CartesianGrid1D, AbstractGridStatistics, AbstractGrid, StandardRegular2D_old, MeshGrids, MeshGridStatistics
 
-
-using ...Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance, AbstractODESettings, Abstract2DModel
 ###### remeshing routines ############
 
 
@@ -222,10 +220,6 @@ function advance!(PI::AbstractParticleInstance,
                 @info "position or Energy is nan, reset"
                 @info PI.position_ij
                 @show PI
-                @info PI.ODEIntegrator.uprev
-                @info PI.ODEIntegrator.uprev2
-
-                test.test
                 
                 t_end = t_start + DT
                 winds_start = convert(  Tuple{Float64,Float64},
@@ -307,7 +301,7 @@ function remesh!(i::Int64, j::Int64, model::Abstract2DModel, DT::Float64)
         ti = model.clock.time
         grid = model.grid
         
-        x = grid.xmin + grid.dx*(i-1)               # A MODIFIER ??? Peut-etre changer i pour i-1 pour mettre bien à 0, pareil pour j
+        x = grid.xmin + grid.dx*(i-1)
         y = grid.ymin + grid.dy*(j-1)
         winds_i::Tuple{Float64,Float64} = winds.u(x, y, ti), winds.v(x, y, ti)
         
@@ -425,7 +419,7 @@ function remesh!(i::Int64, j::Int64, model::Abstract2DModel, DT::Float64)
         ti = model.clock.time
         grid = model.grid
         
-        x = grid.xmin + grid.dx*(i-1)               # A MODIFIER ??? Peut-etre changer i pour i-1 pour mettre bien à 0, pareil pour j
+        x = grid.xmin + grid.dx*(i-1)
         y = grid.ymin + grid.dy*(j-1)
         winds_i::Tuple{Float64,Float64} = winds.u(x, y, ti), winds.v(x, y, ti)
         
