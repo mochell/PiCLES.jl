@@ -173,53 +173,6 @@ function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
                 end
                 # do time step
 
-                #launch new batch of particles from cyclic launch
-                if length(sim.model.PointSourceList) > 0
-                        for k in 1:length(sim.model.PointSourceList)
-                                currentParticle = sim.model.PointSourceList[k].particleLaunch
-                                currentFirstTimeLaunched = sim.model.PointSourceList[k].firstTimeLaunched
-                                period = sqrt(sim.model.grid.dx*sim.model.grid.dy
-                                                /
-                                        (currentParticle.c̄_x^2+currentParticle.c̄_y^2))
-
-                                t = sim.model.ParticleCollection[end].ODEIntegrator.t
-                                #computing how many batches of particles have to be launched
-                                timePrevLaunch = t >= currentFirstTimeLaunched ? t - (t - currentFirstTimeLaunched)%period : -1.0
-                                nBatch = 0
-
-                                while timePrevLaunch > sim.model.ParticleCollection[end].ODEIntegrator.t - sim.Δt
-                                        nBatch+=1
-                                        timePrevLaunch-=period
-                                end
-
-                                for nB in 1:nBatch
-                                        i = Int64(floor((sim.model.PointSourceList[k].particleLaunch.x - sim.model.grid.xmin) / sim.model.grid.dx)) + 1
-                                        j = Int64(floor((sim.model.PointSourceList[k].particleLaunch.y - sim.model.grid.ymin) / sim.model.grid.dy)) + 1
-                                        n_part = sim.model.n_particles_launch
-
-                                        defaults_temp = deepcopy(sim.model.PointSourceList[k].particleLaunch)
-                                        defaults_temp.lne -= log(n_part)
-                                        basePart = SeedParticle(sim.model.State,
-                                                        (i,j), sim.model.ODEsystem, defaults_temp,
-                                                        sim.model.ODEsettings,gridnotes, sim.model.winds,
-                                                        sim.model.ODEsettings.timestep, sim.model.boundary,
-                                                        sim.model.periodic_boundary)
-                                        for _ in 1:n_part
-                                                delta_phi = rand() * defaults_temp.angular_σ - 0.5*defaults_temp.angular_σ
-                                                c_x = defaults_temp.c̄_x * cos(delta_phi) - defaults_temp.c̄_y * sin(delta_phi)
-                                                c_y = defaults_temp.c̄_x * sin(delta_phi) + defaults_temp.c̄_y * cos(delta_phi)
-                                                push!(sim.model.ParticleCollection, deepcopy(basePart))
-                                                sim.model.ParticleCollection[end].ODEIntegrator.u[2] = c_x
-                                                sim.model.ParticleCollection[end].ODEIntegrator.u[3] = c_y
-                                                sim.model.ParticleCollection[end].ODEIntegrator.uprev[2] = c_x
-                                                sim.model.ParticleCollection[end].ODEIntegrator.uprev[3] = c_y
-                                                sim.model.ParticleCollection[end].ODEIntegrator.uprev2[2] = c_x
-                                                sim.model.ParticleCollection[end].ODEIntegrator.uprev2[3] = c_y
-                                        end
-                                end
-                                #@info "nBatch = ", nBatch
-                        end
-                end
                 time_step!(sim.model, sim.Δt, debug=debug)
 
                 if debug & (length(sim.model.FailedCollection) > 0)
