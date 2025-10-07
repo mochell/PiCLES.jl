@@ -305,8 +305,6 @@ end
 
 ## very general verion 2D
 function push_to_grid!(grid::Matrix{Float64},
-                            particlesAtNode::Array{Array{Array{Any,1},1},1},
-                            PI::AbstractParticleInstance,
                             charge::Float64,
                             index_pos::Tuple{Int, Int},
                             weights::Tuple{Float64, Float64},
@@ -316,6 +314,30 @@ function push_to_grid!(grid::Matrix{Float64},
         #grid[ index_pos[1] , index_pos[2] ] += weights[1] * weights[2] * charge
 
 end
+
+## most recent version 2D - not with Boundary types 
+function push_to_grid!(grid::StateTypeL1,
+                            charge::CC,
+                            index_pos::II,
+                            weights::WW,
+                            Nx::Int,  Ny::Int,
+                            periodic::Bool = true) where {CC<:Union{Vector{Float64},SVector{3,Float64},MVector{3,AbstractFloat}},
+                                                            II<:Union{Tuple{Int,Int},SVector{2,Int64}},
+                                                            WW<:Union{Tuple{Float64,Float64},SVector{2,Float16}}}
+    if periodic
+        grid[ wrap_index!(index_pos[1], Nx) , wrap_index!(index_pos[2], Ny), : ] += weights[1] * weights[2] * charge
+    else
+        if sum( test_domain(index_pos, Nx, Ny) ) != 2
+            # position outside of domain
+            return
+        else
+            # position is inside the domain
+            grid[ index_pos[1] , index_pos[2], : ] += weights[1] * weights[2] * charge
+        end
+    end
+
+end
+
 
 ## most recent version 2D - not with Boundary types 
 function push_to_grid!(grid::SharedArray{Float64, 3},
@@ -480,6 +502,18 @@ end
 
 # ----------------------- wrappers -----------------------
 # wrapping over vectors of charges, index positions and weights
+function push_to_grid!(grid::StateTypeL1,
+                            charge::Vector{Float64},
+                            index_pos::Vector{Tuple{Int, Int}},
+                            weights::Vector{Tuple{Float64, Float64}},
+                            Nx::Int, Ny::Int,
+                            periodic::Bool=true)
+    #@info "this is version D"
+    for (i, w) in zip(index_pos, weights)
+        push_to_grid!(grid, charge , i, w , Nx, Ny, periodic)
+    end
+end
+
 function push_to_grid!(grid::SharedArray{Float64, 3},
                             particlesAtNode::Array{Array{Array{Any,1},1},1},
                             PI::AbstractParticleInstance,
@@ -562,6 +596,20 @@ end
 
 # wrapper over 1D Vecors of chanegs and (nested) index positions and weights
 function push_to_grid!(grid::SharedMatrix{Float64},
+    charge::CC,
+    index_pos::Vector{Any},
+    weights::Vector{Any},
+    Nx::Int,
+    periodic::Bool=true) where CC <: Union{Vector{Float64}, SVector{Float64}}
+    #@info "this is version C"
+    for (im, wm, c) in zip(index_pos, weights, charge)
+        for (i, w) in zip(im, wm)
+            push_to_grid!(grid, c, i, w, Nx, periodic)
+        end
+    end
+end
+
+function push_to_grid!(grid::SharedMatrix{Float64},
     particlesAtNode::Array{Array{Array{Any,1},1},1},
     PI::AbstractParticleInstance,
     charge::CC,
@@ -581,8 +629,6 @@ end
 
 # multiple index positions and 1 charge
 function push_to_grid!(grid::MM,
-                            particlesAtNode::Array{Array{Array{Any,1},1},1},
-                            PI::AbstractParticleInstance,
                             charge::CC,
                             index_pos::Vector{Int},
                             weights::Vector{Float64},
@@ -614,8 +660,6 @@ end
 
 # only 1 index position and 1 charge
 function push_to_grid!(grid::MM,
-                            particlesAtNode::Array{Array{Array{Any,1},1},1},
-                            PI::AbstractParticleInstance,
                             charge::Float64,
                             index_pos::Int,
                             weights::Float64,

@@ -1,6 +1,6 @@
 module ParticleSystems
 
-export particle_waves_v3, particle_waves_v3beta, particle_waves_v4, particle_waves_v5, particle_waves_v5
+export particle_waves_v3, particle_waves_v3beta, particle_waves_v4, particle_waves_v5, particle_waves_v6
 
 # include("particle_waves_v3beta.jl")
 # include("particle_waves_v3.jl")
