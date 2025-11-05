@@ -3,9 +3,9 @@ message: "If you use this software, please cite it as below."
 authors:
 - family-names: "Hell"
   given-names: "Momme Claus"
-  orcid: "https://orcid.org/0000-0000-0000-0000"
-title: "PiCLES"
-version: 1.0.0
-doi: 10.5281/zenodo.1234
+  orcid: "https://orcid.org/0000-0002-5754-3925"
+title: "Particle-in-Cell for efficient Swell - PiCLES"
+version: 0.1
+doi: 10.5281/zenodo.13799205
 date-released: 2024-06-06
 url: "https://github.com/mochell/PiCLES"

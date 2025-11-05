@@ -1,9 +1,15 @@
-# PiCLES ![Build Status](https://github.com/mochell/PiCLES.jl/actions/workflows/CI.yml/badge.svg?branch=main)
+# Particle-in-Cell for Efficient Swell - PiCLES ![Build Status](https://github.com/mochell/PiCLES.jl/actions/workflows/CI.yml/badge.svg?branch=main)
 PiCLES is a fast and efficient wave model for Earth System Models, using Particle-in-Cell methods for better performance.
 
 
 ![The PiCLES on a Surfboard|200px](./img/PiCLES_v0.png)
 
+
+PiCLES:
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13799205.svg)](https://doi.org/10.5281/zenodo.13799205)
+
+Paper draft version:
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13799253.svg)](https://doi.org/10.5281/zenodo.13799253)
 
 ## Quick Start
 A brief guide on how to use PiCLES.
@@ -61,14 +67,14 @@ A minimal working example is the following [examples/example_00_minimal.jl](exam
    
    ```julia
    using Pkg
-   # this will be replace by the module load in the future
+   # This will be replaced by the module load in the future
    Pkg.activate("PiCLES/")  # Activate the PiCLES package 
    
    using PiCLES
    using PiCLES.Operators.core_2D: ParticleDefaults
    using PiCLES.Models.WaveGrowthModels2D: WaveGrowth2D
    using PiCLES.Simulations
-   using PiCLES.ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
+   using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjetionKernel, TwoDCartesianGridStatistics
    
    using PiCLES.ParticleSystems: particle_waves_v5 as PW
    using Oceananigans.Units
@@ -77,7 +83,7 @@ A minimal working example is the following [examples/example_00_minimal.jl](exam
    import Plots as plt
    
    # Parameters
-   U10, V10 = 10.0, 10.0 # m/s 
+   U10, V10 = 10.0, 10.0
    DT = 10minutes
    r_g0 = 0.85 # ratio of c / c_g (phase velocity/ group velocity).
    
@@ -87,8 +93,8 @@ A minimal working example is the following [examples/example_00_minimal.jl](exam
    winds = (u=u, v=v)
    
    # Define grid
-   grid = TwoDGrid(100e3, 51, 100e3, 51) # rectangular grid, 51 grid points, 100e3 meters 
-   gn = TwoDGridNotes(grid)
+   grid = TwoDCartesianGridMesh(100e3, 51, 100e3, 51)
+   
    
    # Define ODE parameters
    ODEpars, Const_ID, Const_Scg = PW.ODEParameters(r_g=r_g0)
@@ -96,7 +102,7 @@ A minimal working example is the following [examples/example_00_minimal.jl](exam
    # Define particle equations
    particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q);
    
-   # Calculate minimal windsea based on characteristic winds
+   # Calculate minimal wind sea based on characteristic winds
    WindSeamin = FetchRelations.MinimalWindsea(U10, V10, DT)
    
    # Define default particle
@@ -110,29 +116,29 @@ A minimal working example is the following [examples/example_00_minimal.jl](exam
      saving_step=DT,
      timestep=DT,
      total_time=T = 6days,
-     dt=1e-3, #60*10, 
-     dtmin=1e-4, #60*5, 
+     dt=1e-3, 
+     dtmin=1e-4, 
      force_dtmin=true)
    
    # Build wave model
    wave_model = WaveGrowth2D(; grid=grid,
-     winds=winds,
-     ODEsys=particle_system,
-     ODEsets=ODE_settings,
-     periodic_boundary=false,
-     minimal_particle=FetchRelations.MinimalParticle(U10, V10, DT),
-     movie=true)
+       winds=winds,
+       ODEsys=particle_system,
+       ODEsets=ODE_settings,
+       periodic_boundary=false,
+       minimal_particle=FetchRelations.MinimalParticle(U10, V10, DT),
+       movie=true)
    
    # Build simulation
-   wave_simulation = Simulation(wave_model, Δt=DT, stop_time=2hour)
+   wave_simulation = Simulation(wave_model, Δt=DT, stop_time=2hour)#1hours)
    
    # Run simulation
    run!(wave_simulation, cash_store=true)
    
    # Plot initial state
    istate = wave_simulation.store.store[end];
-   p1 = plt.heatmap(gn.x / 1e3, gn.y / 1e3, istate[:, :, 1])
-   
+   p1 = plt.heatmap(grid.data.x[:,1] / 1e3, grid.data.y[1,:] / 1e3, istate[:, :, 1])
+
    ```
 
 ## How to Cite
