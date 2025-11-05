@@ -14,7 +14,7 @@ using PiCLES.Simulations
 using PiCLES.Operators.TimeSteppers: time_step!, movie_time_step!
 
 using PiCLES.ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
-#using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjetionKernel, TwoDCartesianGridStatistics
+#using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjectionKernel, TwoDCartesianGridStatistics
 using PiCLES.Grids.TripolarGridMOM6: TripolarGridMOM6
 
 using PiCLES.Models.WaveGrowthModels2D

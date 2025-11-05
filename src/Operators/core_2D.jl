@@ -440,7 +440,7 @@ function SeedParticle(
         ODE_settings, #particle_waves_v3.ODESettings type
         
         gridstats::AbstractGridStatistics,
-        ProjetionKernel::Function,
+        ProjectionKernel::Function,
         PropagationCorrection::Function,
 
         ij_mesh::NamedTuple, # local grid information
@@ -474,7 +474,7 @@ function SeedParticle(
         # PropagationCorrection   = gridstats.PropagationCorrection != nothing ? PropagationCorrection(ij_mesh, gridstats) : x -> 0.0
 
         # set projection:
-        ODE_settings.Parameters = (; ODE_settings.Parameters..., M=ProjetionKernel(ij_mesh, gridstats), PC=PropagationCorrection(ij_mesh, gridstats))
+        ODE_settings.Parameters = (; ODE_settings.Parameters..., M=ProjectionKernel(ij_mesh, gridstats), PC=PropagationCorrection(ij_mesh, gridstats))
 
         return InitParticleInstance(
                 particle_system,

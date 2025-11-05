@@ -74,7 +74,7 @@ A minimal working example is the following [examples/example_00_minimal.jl](exam
    using PiCLES.Operators.core_2D: ParticleDefaults
    using PiCLES.Models.WaveGrowthModels2D: WaveGrowth2D
    using PiCLES.Simulations
-   using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjetionKernel, TwoDCartesianGridStatistics
+   using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjectionKernel, TwoDCartesianGridStatistics
    
    using PiCLES.ParticleSystems: particle_waves_v5 as PW
    using Oceananigans.Units

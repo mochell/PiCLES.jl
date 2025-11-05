@@ -147,7 +147,7 @@ end
     inputs:
     data: StructArray{<:Any}
     stats: TwoDSphericalGridStatistics
-    ProjetionKernel: Function that returns the projection kernel for the grid
+    ProjectionKernel: Function that returns the projection kernel for the grid
 
 
 # Examples
@@ -156,7 +156,7 @@ end
 struct TwoDSphericalGridMesh <: SphericalGrid2D
     data::StructArray{<:Any}
     stats::TwoDSphericalGridStatistics
-    ProjetionKernel::Function
+    ProjectionKernel::Function
     PropagationCorrection::Function
 end
 
@@ -200,11 +200,11 @@ end
 function TwoDSphericalGridMesh(xmin, xmax, Nx::Int, ymin, ymax, Ny::Int; mask=nothing, angle=0.0, periodic_boundary=(false, false))
     GS = TwoDSphericalGridStatistics(xmin, xmax, Nx, ymin, ymax, Ny;  angle=angle, periodic_boundary=periodic_boundary)
     GMesh = TwoDSphericalGridMesh(GS, mask=mask)
-    return TwoDSphericalGridMesh(GMesh, GS, ProjetionKernel, SphericalPropagationCorrection)
+    return TwoDSphericalGridMesh(GMesh, GS, ProjectionKernel, SphericalPropagationCorrection)
 end
 
 ## projection Kernel for this grid:
-function ProjetionKernel(Gdata::StructArray)
+function ProjectionKernel(Gdata::StructArray)
     cos_lat = cos.(Gdata.dy * pi / 180)
     # R = 6371.0e3 #meters 
 
@@ -225,7 +225,7 @@ function ProjetionKernel(Gdata::StructArray)
 end
 
 
-function ProjetionKernel(Gi::NamedTuple, stats::TwoDSphericalGridStatistics)
+function ProjectionKernel(Gi::NamedTuple, stats::TwoDSphericalGridStatistics)
     
     cos_lat = cos.(Gi.dy * pi / 180)
     # R = 6371.0e3 #meters
@@ -239,7 +239,7 @@ end
 
 
 # # alias for GRid object
-ProjetionKernel(G::TwoDSphericalGridMesh) = ProjetionKernel(G.stats)
+ProjectionKernel(G::TwoDSphericalGridMesh) = ProjectionKernel(G.stats)
 
 
 end

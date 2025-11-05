@@ -2,7 +2,7 @@
 using Pkg
 Pkg.activate("PiCLES/")
 
-using PiCLES.Grids.TripolarGridMOM6: TripolarGridMOM6, ProjetionKernel
+using PiCLES.Grids.TripolarGridMOM6: TripolarGridMOM6, ProjectionKernel
 using Plots
 
 using Revise
@@ -32,8 +32,8 @@ end
 
 # %% test projection kernel 
 G = TripolarGridMOM6.MOM6GridMesh(load_path * "ocean_hgrid_221123.nc", 4, MaskFile=load_path * "ocean_topo_tx2_3v2_240501.nc")
-@benchmark M = ProjetionKernel(G)
-M = ProjetionKernel(G)
+@benchmark M = ProjectionKernel(G)
+M = ProjectionKernel(G)
 
 # this shows all potions where the kernel is nothing
 scatter( G.data.x[isnothing.(M)], G.data.y[isnothing.(M)], color="black", legend=false, markersize=1)

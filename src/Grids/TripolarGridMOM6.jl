@@ -333,7 +333,7 @@ struct MOM6GridMesh <: TripolarGrid
 
     data::StructArray{<:Any}  # Adjust the type as necessary
     stats::MOM6GridStatistic
-    ProjetionKernel::Function
+    ProjectionKernel::Function
     PropagationCorrection::Function
 
     # initialize with Grid and GridAreaGen objects    
@@ -391,7 +391,7 @@ struct MOM6GridMesh <: TripolarGrid
         )
 
         # Create and return the extended struct with Grid and GridAreaGen objects included
-        return new(data, stats, ProjetionKernel, SphericalPropagationCorrection)
+        return new(data, stats, ProjectionKernel, SphericalPropagationCorrection)
     end
 
     # initialize with Grid and GridAreaGen files
@@ -433,7 +433,7 @@ end
 
 
 ## projection Kernel for this grid:
-function ProjetionKernel(Gdata::StructArray)
+function ProjectionKernel(Gdata::StructArray)
     cosa = cos.(Gdata.angle_dx * pi / 180)
     sina = sin.(Gdata.angle_dx * pi / 180)
     #@SArray
@@ -445,7 +445,7 @@ function ProjetionKernel(Gdata::StructArray)
     return M
 end
 
-function ProjetionKernel(Gi::NamedTuple, stats::TripolarGridStatistics)
+function ProjectionKernel(Gi::NamedTuple, stats::TripolarGridStatistics)
 
     cosa = cos.(Gi.angle_dx * pi / 180)
     sina = sin.(Gi.angle_dx * pi / 180)
@@ -459,7 +459,7 @@ function ProjetionKernel(Gi::NamedTuple, stats::TripolarGridStatistics)
 end
 
 # alias for GRid object
-ProjetionKernel(G::TripolarGrid) = ProjetionKernel(G.data)
+ProjectionKernel(G::TripolarGrid) = ProjectionKernel(G.data)
 
 
 ## Propagation Correction for Spherical Grid

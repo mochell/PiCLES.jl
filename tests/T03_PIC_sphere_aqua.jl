@@ -79,7 +79,7 @@ mask[45:50, 45:61] .= 0
 
 # #mask  = .!mask # to make one active block
 gridstats_mask = Grids.SphericalGrid.TwoDSphericalGridMesh(gridd.stats; mask=mask)
-gridd = Grids.SphericalGrid.TwoDSphericalGridMesh(gridstats_mask, gridd.stats, gridd.ProjetionKernel, gridd.PropagationCorrection)
+gridd = Grids.SphericalGrid.TwoDSphericalGridMesh(gridstats_mask, gridd.stats, gridd.ProjectionKernel, gridd.PropagationCorrection)
 
 Plots.heatmap(transpose(v.(gridd.data.x, gridd.data.y, 120)))
 

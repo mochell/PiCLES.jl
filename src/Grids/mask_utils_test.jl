@@ -1,7 +1,7 @@
 using Pkg
 Pkg.activate("PiCLES/")
 
-using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjetionKernel, TwoDCartesianGridStatistics
+using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjectionKernel, TwoDCartesianGridStatistics
 using PiCLES.Grids
 
 
@@ -16,7 +16,7 @@ mask[10:20, 5:10] .= 0
 
 # reset mesh with amsk 
 gridstats_mask = TwoDCartesianGridMesh(grid.stats; mask=mask)
-grid = TwoDCartesianGridMesh(gridstats_mask, grid.stats, ProjetionKernel)
+grid = TwoDCartesianGridMesh(gridstats_mask, grid.stats, ProjectionKernel)
 
 
 # %%

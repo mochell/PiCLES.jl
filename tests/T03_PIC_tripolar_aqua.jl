@@ -14,7 +14,7 @@ using PiCLES.Simulations
 using PiCLES.Operators.TimeSteppers: time_step!, movie_time_step!
 
 using PiCLES.ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
-using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjetionKernel, TwoDCartesianGridStatistics
+using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjectionKernel, TwoDCartesianGridStatistics
 
 using PiCLES.Models.WaveGrowthModels2D
 
@@ -46,7 +46,7 @@ using PiCLES.Operators: mapping_2D
 
 using PiCLES.Plotting: PlotState_DoubleGlobe, PlotState_SingleGlobe, PlotState_DoubleGlobeSeam, OrthographicTwoMaps, OrthographicTwoMapsSeam
 
-using Plots
+#using Plots
 
 using GLMakie
 
@@ -80,7 +80,7 @@ OrthographicTwoMapsSeam(fig, gridd.data.x, gridd.data.y, gridd.data.angle_dx)
 fig
 
 # %%
-#proj_data = TripolarGridMOM6.ProjetionKernel(gridd.data)
+#proj_data = TripolarGridMOM6.ProjectionKernel(gridd.data)
 proj_data = sin.(gridd.data.angle_dx * pi / 180)
 
 maximum(proj_data)+minimum(proj_data)
@@ -95,8 +95,9 @@ fig
 # mask = trues(size(gridd.data.x))
 # TripolarGridMOM6.TripolarGrid_mask_pols!(mask, gridd, 3)
 
-heatmap(transpose(gridd.data.mask))
-Plots.heatmap(gridd.data.x[:, 1], gridd.data.y[1, :], transpose(gridd.data.mask))
+#heatmap(transpose(gridd.data.mask))
+
+heatmap(gridd.data.x[:, 1], gridd.data.y[1, :], transpose(gridd.data.mask))
 
 # # % Make fake mask
 # mask = ones(Bool, size(grid.data.x)) # 1 is ocean, 0 is land (?)
@@ -104,7 +105,7 @@ Plots.heatmap(gridd.data.x[:, 1], gridd.data.y[1, :], transpose(gridd.data.mask)
 
 # #mask  = .!mask # to make one active block
 # gridstats_mask = TwoDCartesianGridMesh(grid.stats; mask=mask)
-# grid = TwoDCartesianGridMesh(gridstats_mask, grid.stats, ProjetionKernel)
+# grid = TwoDCartesianGridMesh(gridstats_mask, grid.stats, ProjectionKernel)
 # heatmap(transpose(v.(grid.data.x, grid.data.y, 0)))
 
 # %%
@@ -203,7 +204,7 @@ wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=gridd,
 
 wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=4hours)#1hours)
 initialize_simulation!(wave_simulation)
-plot_particle_collection(wave_model)
+# plot_particle_collection(wave_model)
 
 # wave_simulation.model.ParticleCollection
 # wave_simulation.model.ParticleCollection.position_ij

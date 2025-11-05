@@ -218,7 +218,7 @@ function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::
                         SeedParticle2D(
                                 model.State, ij,
                                 model.ODEsystem, defaults, model.ODEsettings,
-                                model.grid.stats, model.grid.ProjetionKernel, model.grid.PropagationCorrection,
+                                model.grid.stats, model.grid.ProjectionKernel, model.grid.PropagationCorrection,
                                 ij_mesh, ij_wind,
                                 model.ODEsettings.timestep,
                                 model.boundary, model.periodic_boundary)

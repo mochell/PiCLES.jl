@@ -14,7 +14,7 @@ using PiCLES.Simulations
 using PiCLES.Operators.TimeSteppers: time_step!, movie_time_step!
 
 using PiCLES.ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
-using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjetionKernel, TwoDCartesianGridStatistics
+using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjectionKernel, TwoDCartesianGridStatistics
 
 using PiCLES.Models.WaveGrowthModels2D
 
@@ -79,19 +79,16 @@ Plots.heatmap(grid.data.x[:, 1], grid.data.y[1, :], transpose(grid.data.mask))
 # % Make fake mask
 mask = ones(Bool, size(grid.data.x)) # 1 is ocean, 0 is land (?)
 mask[20:35, 20:35] .= 0
-# reset mesh with amsk 
-gridstats_mask = TwoDCartesianGridMesh(grid.stats; mask=mask);
-grid = TwoDCartesianGridMesh(gridstats_mask, grid.stats, ProjetionKernel)
-
+# reset mesh with mask
+grid_w_mask = TwoDCartesianGridMesh(grid.stats; mask=mask)
+grid = TwoDCartesianGridMesh(grid_w_mask, grid.stats, ProjectionKernel)
 
 Revise.retry()
-grid.stats.Nx
-grid.stats.Ny
 
 Plots.heatmap(grid.data.x[:,1], grid.data.y[1,:], transpose(grid.data.mask))
 
-# x_prime = ProjetionKernel(grid)[1, 1] .* grid.data.x + ProjetionKernel(grid)[1, 2] .* grid.data.y
-# y_prime = ProjetionKernel(grid)[2, 1] .* grid.data.x + ProjetionKernel(grid)[2, 2] .* grid.data.y
+# x_prime = ProjectionKernel(grid)[1, 1] .* grid.data.x + ProjectionKernel(grid)[1, 2] .* grid.data.y
+# y_prime = ProjectionKernel(grid)[2, 1] .* grid.data.x + ProjectionKernel(grid)[2, 2] .* grid.data.y
 
 
 
