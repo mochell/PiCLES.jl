@@ -2,6 +2,7 @@ name = "PiCLES"
 uuid = "79df3bd2-fdbb-4cb7-a58f-f9c8092d6d68"
 authors = ["Momme C. Hell"]
 version = "0.1.0-DEV"
+description = "A Particle-in-Cell based surface wave model."
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
