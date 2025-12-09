@@ -26,17 +26,6 @@ Manifest.toml
 config/config.json
 
 --temp/*
-Project_save.toml
-package_list.txt
-plots/*
-tests/test_boundary_effect.jl
-tests/test_debug.jl
-Manifest2.toml
-paper1_final/*
 .DS_Store
-test_case_*.html
-test_case_3_batch1_copy.jl
 
 .ipynb*
-
-Description algorithme PiCLES/*
