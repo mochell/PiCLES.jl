@@ -25,5 +25,7 @@ Manifest.toml
 
 config/config.json
 
-plots/*
+--temp/*
 .DS_Store
+
+.ipynb*

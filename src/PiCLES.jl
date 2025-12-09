@@ -26,7 +26,7 @@ export
     Grids,
 
     # utils
-    Utils, Debugging, FetchRelations, ParticleTools, WindEmulator
+    Utils, Debugging, FetchRelations, ParticleTools, WindEmulator, visualization
 
 
     #externals
