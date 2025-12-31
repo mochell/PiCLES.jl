@@ -160,8 +160,6 @@ function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
                 end
         end
 
-        gridnotes = TwoDGridNotes(sim.model.grid)
-
 
         while sim.running
 
@@ -207,6 +205,7 @@ function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
                 sim.running = sim.stop_time >= sim.model.clock.time ? true : false
 
                 if sim.model.plot_steps
+                        gridnotes = TwoDGridNotes(sim.model.grid)
                         plot_state_and_error_points(sim, gridnotes)
                         sec=string(Int64(floor((sim.model.clock.time)/60)))
                         dec=string(Int64(floor(10*(sim.model.clock.time/60-floor((sim.model.clock.time)/60)))))
@@ -297,7 +296,7 @@ initialize the model.ParticleCollection based on the model.grid and the defaults
 If defaults is nothing, then the model.ODEdev is used.
 usually the initilization uses wind constitions to seed the particles.
 """
-function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults,Array{Any,1},Nothing}}
+function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults1D,ParticleDefaults2D,Nothing}}
         #defaults        = isnothing(defaults) ? model.ODEdev : defaults
         if verbose
                 @info "seed PiCLES ... \n"
@@ -457,7 +456,7 @@ initialize the model.ParticleCollection based on the model.grid and the defaults
 If defaults is nothing, then the model.ODEdev is used.
 usually the initilization uses wind constitions to seed the particles.
 """
-function init_particles!(model::Abstract1DModel; defaults::PP=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults,Nothing}}
+function init_particles!(model::Abstract1DModel; defaults::PP=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults1D,ParticleDefaults2D,Nothing}}
         #defaults        = isnothing(defaults) ? model.ODEdev : defaults
         if verbose
                 @info "seed PiCLES ... \n"

@@ -129,8 +129,8 @@ end
 
 
 """  
-WaveGrowth2D(; grid, winds, ODEsys, ODEvars, layers, clock, ODEsets, ODEdefaults, currents, periodic_boundary, CBsets)
-This is the constructor for the WaveGrowth2D model. The inputs are:
+GeometricalOptics(; grid, winds, ODEsys, ODEvars, layers, clock, ODEsets, ODEdefaults, currents, periodic_boundary, CBsets)
+    This is the constructor for the GeometricalOptics model. The inputs are:
     grid             : the grid used in the model,
     winds            : the wind interpolation function here only 1D,
     ODEsys           : the ODE system used in the model,
