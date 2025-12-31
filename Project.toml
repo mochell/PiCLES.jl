@@ -1,7 +1,7 @@
-name = "PiCLES"
+name = "PiCLES.jl"
 uuid = "79df3bd2-fdbb-4cb7-a58f-f9c8092d6d68"
 authors = ["Momme C. Hell"]
-version = "0.1.0-DEV"
+version = "0.1.0"
 description = "A Particle-in-Cell based surface wave model."
 
 [deps]
