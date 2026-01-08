@@ -64,7 +64,7 @@ mutable struct GeometricalOptics{Grid<:AbstractGrid,
                         nPart,
                         wnds,
                         cur,
-                        Mstat} <: Abstract2DModel where {Mstat<:Union{Nothing,stat}, PCollection<:Union{Vector,Array}}
+                        Mstat} <: Abstract2DStochasticModel where {Mstat<:Union{Nothing,stat}, PCollection<:Union{Vector,Array}}
     #Union{Vector,DArray}
     grid::Grid
     layers::Lay      # number of layers used in the model, 1 is eneough

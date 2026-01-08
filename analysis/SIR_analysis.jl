@@ -199,7 +199,7 @@ function pearson(data, predicted)
 end
 
 ## Reading the data
-localpath = pwd()
+localpath = pwd()*"/.."
 
 # parentPath = localpath * "/plots/tests/paper/test_case_1/v2_pi"
 # parentPath = localpath * "/plots/tests/paper/test_case_2_local/v2_pi_4"

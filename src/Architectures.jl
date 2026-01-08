@@ -53,6 +53,7 @@ abstract type AbstractModel{TS} end
 
 abstract type Abstract1DModel <: AbstractModel{Nothing} end
 abstract type Abstract2DModel <: AbstractModel{Nothing} end
+abstract type Abstract2DStochasticModel <: Abstract2DModel end
 
 #All posiible types of a single-layer StateVectors
 StateTypeL1 = Union{SharedArray{Float64,3},MArray}
