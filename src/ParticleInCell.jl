@@ -10,6 +10,7 @@ using ..custom_structures: wni, N_Periodic, N_NonPeriodic, N_TripolarNorth
 
 # %%
 using ..ParticleMesh
+using ...Architectures: AbstractParticleInstance
 # Tolerance for comparison of real numbers: set it here!
 
 # Set parameters
@@ -316,7 +317,7 @@ end
 
 ## most recent version 2D - not with Boundary types 
 function push_to_grid!(grid::StateTypeL1,
-                            charge::CC, 
+                            charge::CC,
                             index_pos::II,
                             weights::WW,
                             Nx::Int, Ny::Int,
@@ -332,6 +333,31 @@ function push_to_grid!(grid::StateTypeL1,
         else
             # position is inside the domain
             grid[ index_pos[1] , index_pos[2], : ] += weights[1] * weights[2] * charge
+        end
+    end
+
+end
+
+
+# ## most recent version 2D - not with Boundary types 
+function push_to_grid!(grid::SharedArray{Float64, 3},
+                            particlesAtNode::Array{Array{Array{Any,1},1},1},
+                            PI::AbstractParticleInstance,
+                            charge::Vector{Float64},
+                            index_pos::Tuple{Int, Int},
+                            weights::Tuple{Float64, Float64},
+                            Nx::Int,  Ny::Int,
+                            periodic::Bool = true)
+    if periodic
+        grid[ wrap_index!(index_pos[1], Nx) , wrap_index!(index_pos[2], Ny), : ] += weights[1] * weights[2] * charge
+    else
+        if sum( test_domain(index_pos, Nx, Ny) ) != 2
+            # position outside of domain
+            return
+        else
+            # position is inside the domain
+            push!(particlesAtNode[index_pos[1]][index_pos[2]], [weights[1] * weights[2], charge[4], PI])
+            grid[ index_pos[1] , index_pos[2], 1:3 ] += weights[1] * weights[2] * charge[1:3]
         end
     end
 
@@ -488,6 +514,20 @@ function push_to_grid!(grid::StateTypeL1,
     end
 end
 
+function push_to_grid!(grid::SharedArray{Float64, 3},
+                            particlesAtNode::Array{Array{Array{Any,1},1},1},
+                            PI::AbstractParticleInstance,
+                            charge::Vector{Float64},
+                            index_pos::Vector{Tuple{Int, Int}},
+                            weights::Vector{Tuple{Float64, Float64}},
+                            Nx::Int, Ny::Int,
+                            periodic::Bool=true)
+    #@info "this is version D"
+    for (i, w) in zip(index_pos, weights)
+        push_to_grid!(grid, particlesAtNode, PI, charge , i, w , Nx, Ny, periodic)
+    end
+end
+
 #push_to_grid!(charges_grid, 1.0 , index_positions[3], weights[3] , grid2d.Nx , grid2d.Ny )
 ## allocation optimized:
 
@@ -511,6 +551,19 @@ end
 """
 wrapper over FieldVector weight&index (wni), 
 """
+function push_to_grid!(grid::SharedArray{Float64, 3},
+                            particlesAtNode::Array{Array{Array{Any,1},1},1},
+                            PI::AbstractParticleInstance,
+                            charge::CC,
+                            wni::FieldVector,
+                            Nx::Int, Ny::Int,
+                            periodic::Bool=true) where CC <: Union{Vector{Float64}, SVector{3, Float64}}
+    #@info "this is version D"
+    for (i, w) in construct_loop(wni)
+        push_to_grid!(grid,particlesAtNode, PI, charge, i, w, Nx, Ny, periodic)
+    end
+end
+
 function push_to_grid!(grid::StateTypeL1,
     charge::CC,
     wni::FieldVector,
@@ -555,6 +608,22 @@ function push_to_grid!(grid::SharedMatrix{Float64},
         end
     end
 end
+
+# function push_to_grid!(grid::SharedMatrix{Float64},
+#     particlesAtNode::Array{Array{Array{Any,1},1},1},
+#     PI::AbstractParticleInstance,
+#     charge::CC,
+#     index_pos::Vector{Any},
+#     weights::Vector{Any},
+#     Nx::Int,
+#     periodic::Bool=true) where CC <: Union{Vector{Float64}, SVector{Float64}}
+#     #@info "this is version C"
+#     for (im, wm, c) in zip(index_pos, weights, charge)
+#         for (i, w) in zip(im, wm)
+#             push_to_grid!(grid, particlesAtNode, PI, c, i, w, Nx, periodic)
+#         end
+#     end
+# end
 
 
 
