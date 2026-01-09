@@ -15,7 +15,7 @@ using ...custom_structures: ParticleInstance1D, ParticleInstance2D, MarkedPartic
 
 using ..core_2D_spread: GetParticleEnergyMomentum, GetVariablesAtVertex, Get_u_FromShared, ResetParticleValues, ParticleDefaults, InitParticleInstance
 
-using ...Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance, AbstractODESettings, StateTypeL1, Abstract2DModel
+using ...Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance, AbstractODESettings, StateTypeL1, Abstract2DModel, Abstract2DStochasticModel
 using ...Architectures: Grid2D, CartesianGrid, CartesianGridStatistics, CartesianGrid2D, CartesianGrid1D, AbstractGridStatistics, AbstractGrid, StandardRegular2D_old, MeshGrids, MeshGridStatistics
 
 ###### remeshing routines ############
@@ -296,7 +296,7 @@ end
         Wrapper function that does everything necessary to remesh the particles.
         - pushes the Node State to particle instance
 """
-function remesh!(i::Int64, j::Int64, model::Abstract2DModel, DT::Float64)
+function remesh!(i::Int64, j::Int64, model::Abstract2DStochasticModel, DT::Float64)
         winds = model.winds
         ti = model.clock.time
         grid = model.grid
@@ -315,7 +315,7 @@ Pushes node value to particle:
 - If Node value is okey, it is converted to state variable and pushed to particle.
 - The particle position is set to the node positions
 """
-function NodeToParticle!(i::Int64, j::Int64, x::Float64, y::Float64, model::Abstract2DModel, wind_tuple::Tuple{Float64,Float64}, DT::Float64)
+function NodeToParticle!(i::Int64, j::Int64, x::Float64, y::Float64, model::Abstract2DStochasticModel, wind_tuple::Tuple{Float64,Float64}, DT::Float64)
         S = model.State
         minimal_particle = model.minimal_particle
         minimal_state = model.minimal_state
