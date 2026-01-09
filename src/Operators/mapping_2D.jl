@@ -95,7 +95,7 @@ function ParticleToNode!(PI::AbstractParticleInstance, S::SharedMatrix, u_state:
         nothing
 end
 
-function set_u_and_t!(integrator, u_new::CC, t_new::Number) where CC <:Union{Vector{Float64},MVector}
+function set_u_and_t_stochas!(integrator, u_new::CC, t_new::Number) where CC <:Union{Vector{Float64},MVector}
         # adding a small deviation due to directional spreading
         d = Normal(0, u_new[6]^2)
         delta_phi = rand(d,1)
@@ -103,6 +103,11 @@ function set_u_and_t!(integrator, u_new::CC, t_new::Number) where CC <:Union{Vec
         c_y = u_new[2] * sin(delta_phi[1]) + u_new[3] * cos(delta_phi[1])
         u_new[2] = c_x
         u_new[3] = c_y
+        integrator.u = u_new
+        integrator.t = t_new
+end
+
+function set_u_and_t!(integrator, u_new::CC, t_new::Number) where CC <:Union{Vector{Float64},MVector}
         integrator.u = u_new
         integrator.t = t_new
 end
@@ -116,9 +121,15 @@ function reset_PI_u!(PI::AbstractParticleInstance; ui::CC) where CC<:Union{Vecto
 end
 
 
-function reset_PI_ut!(PI::AbstractParticleInstance; ui::CC, ti::Number) where CC <:Union{Vector{Float64},MVector}
+function reset_PI_ut!(PI::AbstractParticleInstance; ui::CC, ti::Number, stochas::Bool) where CC <:Union{Vector{Float64},MVector}
         # this method keeps the correct time for time varying forcing (~may 2023)
-        set_u_and_t!(PI.ODEIntegrator, ui, ti)
+        if stochas
+                set_u_and_t_stochas!(PI.ODEIntegrator, ui, ti)
+                @info "called the correct version"
+        else
+                @info "called the wrong version"
+                set_u_and_t!(PI.ODEIntegrator, ui, ti)
+        end
         u_modified!(PI.ODEIntegrator, true)
         auto_dt_reset!(PI.ODEIntegrator)
 end
@@ -415,7 +426,7 @@ end
         Wrapper function that does everything necessary to remesh the particles.
         - pushes the Node State to particle instance
 """
-function remesh!(i::Int64, j::Int64, model::Abstract2DModel, DT::Float64)
+function remesh!(i::Int64, j::Int64, model::Abstract2DStochasticModel, DT::Float64)
         winds = model.winds
         ti = model.clock.time
         grid = model.grid
@@ -466,7 +477,7 @@ function NodeToParticle!(PI::AbstractParticleInstance, S::StateTypeL1,
                 #@show "u_state", u_state
                 ui = GetVariablesAtVertex(u_state, xy[1], xy[2])
                 #@info exp(ui[1]), ui[2], ui[4]/1e3, ui[5]/1e3
-                reset_PI_ut!(PI; ui=ui, ti=last_t)
+                reset_PI_ut!(PI; ui=ui, ti=last_t, stochas=true)
                 PI.on = true
 
                 # this method is more robust than the set_u! method (~february 2023)
