@@ -25,6 +25,10 @@ Manifest.toml
 
 config/config.json
 
+plots/*
+.DS_Store
+
+# Tom's files
 --temp/*
 .DS_Store
 
