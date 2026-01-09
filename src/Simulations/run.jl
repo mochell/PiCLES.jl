@@ -5,7 +5,7 @@ using ..Operators.core_1D: ParticleDefaults as ParticleDefaults1D
 using ..Operators.core_1D: SeedParticle! as SeedParticle1D!
 using ..Operators.core_2D_spread: SeedParticle! as SeedParticle2D!
 
-using ..Architectures: Abstract2DModel, Abstract1DModel
+using ..Architectures: Abstract2DModel, Abstract1DModel, Abstract2DStochasticModel
 using ..ParticleMesh: OneDGrid, OneDGridNotes, TwoDGrid, TwoDGridNotes
 
 #using WaveGrowthModels: init_particles!
@@ -298,7 +298,7 @@ initialize the model.ParticleCollection based on the model.grid and the defaults
 If defaults is nothing, then the model.ODEdev is used.
 usually the initilization uses wind constitions to seed the particles.
 """
-function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults1D,ParticleDefaults2D,Array{Any,1},Nothing}}
+function init_particles!(model::Abstract2DStochasticModel; defaults::PP=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults1D,ParticleDefaults2D,Array{Any,1},Nothing}}
         #defaults        = isnothing(defaults) ? model.ODEdev : defaults
         if verbose
                 @info "seed PiCLES ... \n"
@@ -371,35 +371,6 @@ function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::
                                                         model.ODEsettings.timestep, model.boundary,
                                                         model.periodic_boundary))
                                 end
-                                # for _ in 1:n_part
-                                #         temp_boucle = true
-                                #         while temp_boucle
-                                #                 defaults_temp = deepcopy(defaults)
-                                #                 mu = [defaults_temp.c̄_x, defaults_temp.c̄_y, defaults_temp.x, defaults_temp.y]
-                                #                 d = MvNormal(mu, model.proba_covariance_init)
-                                #                 real = rand(d,1)
-                                #                 delta_phi = real[1]
-                                #                 #delta_phi < 0 ? delta_phi = - delta_phi : delta_phi = delta_phi
-                                #                 #delta_phi < 0.01 ? delta_phi+=1 : delta_phi +=0
-                                #                 #c_x = (real[2]+1)*(defaults_temp.c̄_x * cos(delta_phi) - defaults_temp.c̄_y * sin(delta_phi))
-                                #                 #c_y = (real[2]+1)*(defaults_temp.c̄_x * sin(delta_phi) + defaults_temp.c̄_y * cos(delta_phi))
-                                #                 c_x = real[1]
-                                #                 c_y = real[2]
-                                #                 defaults_temp.lne += -log(n_part)
-                                #                 defaults_temp.c̄_x = c_x
-                                #                 defaults_temp.c̄_y = c_y
-                                #                 defaults_temp.x = real[3]
-                                #                 defaults_temp.y = real[4]
-                                #                 if c_x^2+c_y^2<=1
-                                #                         push!(ParticleCollection, SeedParticle(model.State,
-                                #                                 (i,j), model.ODEsystem, defaults_temp,
-                                #                                 model.ODEsettings,gridnotes, model.winds,
-                                #                                 model.ODEsettings.timestep, model.boundary,
-                                #                                 model.periodic_boundary))
-                                #                         temp_boucle = false
-                                #                 end
-                                #         end
-                                # end
                         end
                 else
                         push!(ParticleCollection, SeedParticle(model.State,
@@ -423,7 +394,55 @@ function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::
         nothing
 end
 
+function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults1D,ParticleDefaults2D,Nothing}}
+        #defaults        = isnothing(defaults) ? model.ODEdev : defaults
+        if verbose
+                @info "seed PiCLES ... \n"
+                @info "defaults is $(defaults)"
+                if defaults isa Dict
+                        @info "found particle initials, just replace position "
+                else
+                        @info "no particle defaults found, use windsea to seed particles"
+                end
+        end
 
+        ParticleCollection = StructArray(map(ij -> begin
+
+                        ij_mesh = model.grid.data[ij]
+                        ij_wind = (     model.winds.u(ij_mesh.x, ij_mesh.y, 0.0), 
+                                        model.winds.v(ij_mesh.x, ij_mesh.y, 0.0)
+                                        )
+
+                        SeedParticle2D(
+                                model.State, ij,
+                                model.ODEsystem, defaults, model.ODEsettings,
+                                model.grid.stats, model.grid.ProjetionKernel, model.grid.PropagationCorrection,
+                                ij_mesh, ij_wind,
+                                model.ODEsettings.timestep,
+                                model.boundary, model.periodic_boundary)
+
+                end, CartesianIndices(model.grid.data)))
+
+
+        # threads for loop version
+        # ParticleCollection = StructArray{ParticleInstance2D}(undef, grid.stats.Nx, grid.stats.Ny)
+
+        # speed tests
+        # 1 thread  8.736 ms (124253 allocations: 12.39 MiB)
+        # 4 thread   4.443 ms (123316 allocations: 12.35 MiB)
+        # @btime @threads for ij in CartesianIndices(mesh)
+        #         ParticleCollection4[ij] = SeedParticle(
+                                # model.State, ij,
+                                # model.ODEsystem, defaults, model.ODEsettings,
+                                # model.grid.stats, ij_mesh, ij_wind,
+                                # model.DT,
+                                # model.boundary, model.periodic_boundary)
+        # end
+        @info typeof(ParticleCollection)
+        # @info ParticleCollection
+        model.ParticleCollection = ParticleCollection
+        nothing
+end
 
 
 
