@@ -38,6 +38,21 @@ S       Shared array where particles are stored
 G       (TwoDGrid) Grid that defines the nodepositions
 """
 
+function ParticleToNode!(PI::AbstractParticleInstance, particlesAtNode::Array{Array{Array{Any,1},1},1}, S::SharedArray, G::TwoDGrid, periodic_boundary::Bool)
+        
+        #u[4], u[5] are the x and y positions of the particle
+        #index_positions, weights = PIC.compute_weights_and_index(G, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5])
+        weights_and_index = PIC.compute_weights_and_index_mininal(G, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5])
+
+        #ui[1:2] .= PI.position_xy
+        u_state = GetParticleEnergyMomentum(PI.ODEIntegrator.u)
+        #@show u_state
+
+        #PIC.push_to_grid!(S, particlesAtNode, PI, u_state , index_positions,  weights, G.Nx, G.Ny , periodic_boundary)
+        PIC.push_to_grid!(S, particlesAtNode, PI, u_state , weights_and_index, G.Nx, G.Ny , periodic_boundary)
+        nothing
+end
+
 function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGrid, periodic_boundary::Bool)
 
         #u[4], u[5] are the x and y positions of the particle
@@ -121,6 +136,7 @@ end
         advance!(PI::AbstractParticleInstance, S::SharedMatrix{Float64}, G::TwoDGrid, DT::Float64)
 """
 function advance!(PI::AbstractParticleInstance,
+                        particlesAtNode::Array{Array{Array{Any,1},1},1},
                         S::StateTypeL1,
                         Failed::Vector{AbstractMarkedParticleInstance},
                         Grid::Union{Grid2D,MeshGrids},
@@ -243,7 +259,8 @@ function advance!(PI::AbstractParticleInstance,
 
         #if PI.ODEIntegrator.u[1] > -13.0 #ODEs.log_energy_minimum # the minimum enerçy is distributed to 4 neighbouring particles
         if PI.on 
-                ParticleToNode!(PI, S, Grid, periodic_boundary)
+                ParticleToNode!(PI, particlesAtNode, S, Grid, periodic_boundary)
+                # ParticleToNode!(PI, S, Grid, periodic_boundary)
         end
 
         #return PI

@@ -1,4 +1,6 @@
-using ..Operators.core_2D_spread: ParticleDefaults, SeedParticle
+using ..Operators.core_2D_spread: SeedParticle
+using ..Operators.core_2D_spread: ParticleDefaults as ParticleDefaults2D
+using ..Operators.core_1D: ParticleDefaults as ParticleDefaults1D
 
 using ..Operators.core_1D: SeedParticle! as SeedParticle1D!
 using ..Operators.core_2D_spread: SeedParticle! as SeedParticle2D!
@@ -227,8 +229,8 @@ initialize_simulation!(sim::Simulation)
 initialize the simulation sim by calling init_particles! to initialize the model.ParticleCollection.
 -particle_initials::T=nothing  was removed from arguments
 """
-function initialize_simulation!(sim::Simulation)# where {PP<:Union{ParticleDefaults,Nothing}}
-        # copy(ParticleDefaults(log(4e-8), 1e-2, 0.0)))
+function initialize_simulation!(sim::Simulation)# where {PP<:Union{ParticleDefaults2D,Nothing}}
+        # copy(ParticleDefaults2D(log(4e-8), 1e-2, 0.0)))
 
         if sim.verbose
                 @info "init particles..."
@@ -251,7 +253,7 @@ reset_simulation!(sim::Simulation)
 reset the simulation sim by calling init_particles! to reinitialize the model.ParticleCollection, sets the model.clock.time, model.clock.iteration, and model.state to 0.
 - particle_initials::Dict{Num, Float64} was removed from arguments
 """
-function reset_simulation!(sim::Simulation)# where {PP<:Union{ParticleDefaults,Nothing}}
+function reset_simulation!(sim::Simulation)# where {PP<:Union{ParticleDefaults2D,Nothing}}
 
         sim.running = false
         sim.run_wall_time = 0.0
@@ -296,7 +298,7 @@ initialize the model.ParticleCollection based on the model.grid and the defaults
 If defaults is nothing, then the model.ODEdev is used.
 usually the initilization uses wind constitions to seed the particles.
 """
-function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults1D,ParticleDefaults2D,Nothing}}
+function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults1D,ParticleDefaults2D,Array{Any,1},Nothing}}
         #defaults        = isnothing(defaults) ? model.ODEdev : defaults
         if verbose
                 @info "seed PiCLES ... \n"
@@ -317,28 +319,12 @@ function init_particles!(model::Abstract2DModel; defaults::PP=nothing, verbose::
                 gridnotes, model.winds, model.ODEsettings.timestep,
                 model.boundary, model.periodic_boundary)
 
-                #end, CartesianIndices(model.grid.data)
 
-
-        # threads for loop version
-        # ParticleCollection = StructArray{ParticleInstance2D}(undef, grid.stats.Nx, grid.stats.Ny)
-
-        # speed tests
-        # 1 thread  8.736 ms (124253 allocations: 12.39 MiB)
-        # 4 thread   4.443 ms (123316 allocations: 12.35 MiB)
-        # @btime @threads for ij in CartesianIndices(mesh)
-        #         ParticleCollection4[ij] = SeedParticle(
-                                # model.State, ij,
-                                # model.ODEsystem, defaults, model.ODEsettings,
-                                # model.grid.stats, ij_mesh, ij_wind,
-                                # model.DT,
-                                # model.boundary, model.periodic_boundary)
-        # end
         @info typeof(ParticleCollection)
-        # @info ParticleCollection
+
         model.ParticleCollection = ParticleCollection
 
-        if defaults isa ParticleDefaults
+        if defaults isa ParticleDefaults2D
                 i = Int64(floor((defaults.x - model.grid.xmin) / model.grid.dx)) + 1
                 j = Int64(floor((defaults.y - model.grid.ymin) / model.grid.dy)) + 1
                 gridnotes = TwoDGridNotes(model.grid)
