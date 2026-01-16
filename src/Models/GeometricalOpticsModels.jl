@@ -24,7 +24,8 @@ using ...FetchRelations
 
 using LinearAlgebra
 
-#includet("mapping_1D.jl")
+using ..WaveGrowthModels2D
+# include("WaveGrowthModels2D.jl")
 
 # TO DO : check if all the modules imported above are necessary, for now I just copied the ones from WaveGrowthModels2D.jl
 
@@ -111,21 +112,6 @@ end
 
 
 ## 2D version
-"""
-mark_boundary(grid::TwoDGrid)
-function that returns list of boundary nodes (tuples of indixes)
-"""
-function mark_boundary(grid::TwoDGrid)
-    #get x and y coordinates
-    xi = collect(range(1, stop=grid.Nx, step=1))
-    yi = collect(range(1, stop=grid.Ny, step=1))
-
-    # make boundary nodes
-    a = [(xi[i], yi[j]) for j in 1:grid.Ny   , i in [1, grid.Nx]]
-    b = [(xi[i], yi[j]) for j in [1, grid.Ny], i in 1:grid.Nx   ]
-    #merge a and b
-    return vcat(vec(a), vec(b)) #vec(vcat(a, b))
-end
 
 
 """  
@@ -143,7 +129,7 @@ GeometricalOptics(; grid, winds, ODEsys, ODEvars, layers, clock, ODEsets, ODEdef
     periodic_boundary: if true we use a periodic boundary (default true),
     CBsets           : the callback settings (not implimented yet).
 """
-function GeometricalOptics(; grid::TwoDGrid,
+function GeometricalOptics(; grid::GG,
     winds::NamedTuple{(:u, :v)}, 
     ODEsys, 
     ODEvars=nothing, #needed for MTK for ODEsystem. will be depriciated later
@@ -164,22 +150,23 @@ function GeometricalOptics(; grid::TwoDGrid,
     save_particles=false,
     n_particles_launch=150,
     CBsets=nothing,
-    movie=false) where {PP<:Union{ParticleDefaults2D,String}}
+    movie=false) where {PP<:Union{ParticleDefaults2D,String},GG<:AbstractGrid}
 
     # initialize state {SharedArray} given grid and layers
     # Number of state variables 
     Nstate = 4
-    if layers > 1
-        State = SharedArray{Float64,4}(grid.Nx, grid.Ny, Nstate, layers)
-    else
-        State = SharedArray{Float64,3}(grid.Nx, grid.Ny, Nstate)
-    end
+    State = init_StateArray(grid, Nstate, layers)
+    # if layers > 1
+    #     State = SharedArray{Float64,4}(grid.stats.Nx.N, grid.stats.Ny.N, Nstate, layers)
+    # else
+    #     State = SharedArray{Float64,3}(grid.stats.Nx.N, grid.stats.Ny.N, Nstate)
+    # end
 
     if layers > 1
         ParticlesAtNode = Array{Array{Array{Array{Any,1},1},1},1}()
-        for i in 1:grid.Nx
+        for i in 1:grid.stats.Nx.N
             push!(ParticlesAtNode, [])
-            for j in 1:grid.Ny
+            for j in 1:grid.stats.Ny.N
                 push!(ParticlesAtNode[i], [])
                 for _ in 1:layers
                     push!(ParticlesAtNode[i][j], [])
@@ -189,9 +176,9 @@ function GeometricalOptics(; grid::TwoDGrid,
         ParticlePool = Array{Array{Any,1},1}()
     else
         ParticlesAtNode = Array{Array{Array{Any,1},1},1}()
-        for i in 1:grid.Nx
+        for i in 1:grid.stats.Nx.N
             push!(ParticlesAtNode, [])
-            for _ in 1:grid.Ny
+            for _ in 1:grid.stats.Ny.N
                 push!(ParticlesAtNode[i], [])
             end
         end
@@ -203,7 +190,7 @@ function GeometricalOptics(; grid::TwoDGrid,
     elseif ODEinit_type == "wind_sea"
         ODEdefaults = nothing
     elseif ODEinit_type == "mininmal"
-        ODEdefaults = ParticleDefaults1D(-11.0, 1e-3, 0.0)
+        ODEdefaults = ParticleDefaults2D(-11.0, 1e-3, 0.0)
     else
         error("ODEinit_type must be either 'wind_sea','mininmal', or ParticleDefaults2D instance ")
     end
@@ -300,26 +287,6 @@ function GeometricalOptics(; grid::TwoDGrid,
 end
 
 
-
-
-"""
-    fields(model::WaveGrowth)
-
-Return a flattened `NamedTuple` of the State vector for a `GeometricalOptics` model.
-"""
-fields(model::GeometricalOptics) = (State=model.State,)
-# # Oceananigans.Simulations interface
-# fields(m::ContinuumIceModel) = merge(m.velocities, m.stresses)
-
-function reset_boundary!(model::GeometricalOptics)
-
-    if model.periodic_boundary  # if false, define boundary points here:
-        boundary = []
-    else
-        boundary = boundary = mark_boundary(grid)
-    end
-
-end
 
 
 function Base.show(io::IO, ow::GeometricalOptics)

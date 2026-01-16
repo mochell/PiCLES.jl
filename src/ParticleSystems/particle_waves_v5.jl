@@ -4,7 +4,7 @@ using DifferentialEquations, IfElse
 
 using ...Architectures: AbstractODESettings, AbstractParticleSystem, IDConstantsInstance, ScgConstantsInstance
 
-export particle_equations, ODESettings
+export particle_equations, ODESettings, ODEParameters
 using LinearAlgebra
 using StaticArrays
 

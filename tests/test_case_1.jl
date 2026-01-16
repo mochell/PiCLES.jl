@@ -14,6 +14,7 @@ using PiCLES.Simulations
 using PiCLES.Operators.TimeSteppers: time_step!, movie_time_step!
 
 using PiCLES.ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
+using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, TwoDCartesianGridStatistics
 using PiCLES.Models.GeometricalOpticsModels
 
 using Oceananigans.TimeSteppers: Clock, tick!
@@ -56,9 +57,9 @@ winds = (u=u, v=v)
 typeof(winds.u)
 typeof(winds.u(1e3, 1e3, 11))
 
-grid = TwoDGrid(22.5e4, 151, 22.5e4, 151)
-mesh = TwoDGridMesh(grid, skip=1);
-gn = TwoDGridNotes(grid);
+grid =TwoDCartesianGridMesh(22.5e4, 151, 22.5e4, 151; periodic_boundary=(false, true))
+# mesh = TwoDGridMesh(grid, skip=1);
+# gn = TwoDGridNotes(grid);
 
 Revise.retry()
 

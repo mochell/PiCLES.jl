@@ -151,8 +151,7 @@ function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, deb
         @info maximum(model.State[:, :, 1]), maximum(model.State[:, :, 2]), maximum(model.State[:, :, 3])
         model.FailedCollection = FailedCollection
     end 
-
-    for (i,j) in [(i,j) for i in 1:model.grid.Nx for j in 1:model.grid.Ny]
+    for (i,j) in [(i,j) for i in 1:model.grid.stats.Nx.N for j in 1:model.grid.stats.Ny.N]
         for k in 1:length(model.ParticlesAtNode[i][j])
             pop!(model.ParticlesAtNode[i][j])
         end
@@ -172,7 +171,7 @@ function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, deb
         write_particles_to_csv(model, Δt)
     end
 
-    for (i,j) in [(i,j) for i in 1:model.grid.Nx for j in 1:model.grid.Ny]
+    for (i,j) in [(i,j) for i in 1:model.grid.stats.Nx.N for j in 1:model.grid.stats.Ny.N]
         weights = [model.ParticlesAtNode[i][j][k][1] for k in 1:length(model.ParticlesAtNode[i][j])]
         values = [model.ParticlesAtNode[i][j][k][2] for k in 1:length(model.ParticlesAtNode[i][j])]
         if length(weights) > 0
@@ -233,7 +232,7 @@ function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, deb
         nPreviousParticles = 0
         model.ParticlePool = []
 
-        @threads for (i,j) in [(i,j) for i in 1:model.grid.Nx for j in 1:model.grid.Ny]
+        @threads for (i,j) in [(i,j) for i in 1:model.grid.stats.Nx.N for j in 1:model.grid.stats.Ny.N]
             locallen = length(model.ParticlesAtNode[i][j])
             nPreviousParticles += locallen
             @threads for k in 1:locallen
@@ -288,8 +287,8 @@ function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, deb
         for k in 1:nNewParticles
             i = model.ParticlePool[particlesDrawn[k]][2]
             j = model.ParticlePool[particlesDrawn[k]][3]
-            x = model.grid.xmin + model.grid.dx*(i-1)
-            y = model.grid.ymin + model.grid.dy*(j-1)
+            x = model.grid.stats.xmin + model.grid.stats.dx*(i-1)
+            y = model.grid.stats.ymin + model.grid.stats.dy*(j-1)
             #log_energy = log(totEnergyDomain[1]/nPreviousParticles)
             log_energy = log(ParticuleEnergiesNorm/nNewParticles)
             c_x = model.ParticlePool[particlesDrawn[k]][1].ODEIntegrator.u[2]

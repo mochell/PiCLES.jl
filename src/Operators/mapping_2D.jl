@@ -7,6 +7,7 @@ using Printf
 using Random, Distributions
 
 using ...ParticleMesh: TwoDGrid, TwoDGridNotes
+using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjetionKernel, TwoDCartesianGridStatistics
 import ...ParticleInCell as PIC
 
 using ...FetchRelations
@@ -38,7 +39,7 @@ S       Shared array where particles are stored
 G       (TwoDGrid) Grid that defines the nodepositions
 """
 
-function ParticleToNode!(PI::AbstractParticleInstance, particlesAtNode::Array{Array{Array{Any,1},1},1}, S::SharedArray, G::TwoDGrid, periodic_boundary::Bool)
+function ParticleToNode!(PI::AbstractParticleInstance, particlesAtNode::Array{Array{Array{Any,1},1},1}, S::SharedArray, G::TwoDCartesianGridMesh, periodic_boundary::Bool)
         
         #u[4], u[5] are the x and y positions of the particle
         #index_positions, weights = PIC.compute_weights_and_index(G, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5])
@@ -48,8 +49,8 @@ function ParticleToNode!(PI::AbstractParticleInstance, particlesAtNode::Array{Ar
         u_state = GetParticleEnergyMomentum(PI.ODEIntegrator.u)
         #@show u_state
 
-        #PIC.push_to_grid!(S, particlesAtNode, PI, u_state , index_positions,  weights, G.Nx, G.Ny , periodic_boundary)
-        PIC.push_to_grid!(S, particlesAtNode, PI, u_state , weights_and_index, G.Nx, G.Ny , periodic_boundary)
+        #PIC.push_to_grid!(S, particlesAtNode, PI, u_state , index_positions,  weights, G.stats.Nx.N, G.stats.Ny.N , periodic_boundary)
+        PIC.push_to_grid!(S, particlesAtNode, PI, u_state , weights_and_index, G.stats.Nx.N, G.stats.Ny.N , periodic_boundary)
         nothing
 end
 
@@ -64,8 +65,8 @@ function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGr
         u_state = GetParticleEnergyMomentum(PI.ODEIntegrator.u)
         #@show u_state
 
-        #PIC.push_to_grid!(S, u_state , index_positions,  weights, G.Nx, G.Ny , periodic_boundary)
-        PIC.push_to_grid!(S, u_state , weights_and_index, G.Nx, G.Ny , periodic_boundary)
+        #PIC.push_to_grid!(S, u_state , index_positions,  weights, G.stats.Nx.N, G.stats.Ny.N , periodic_boundary)
+        PIC.push_to_grid!(S, u_state , weights_and_index, G.stats.Nx.N, G.stats.Ny.N , periodic_boundary)
         nothing
 end
 
@@ -80,7 +81,7 @@ function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::MeshGr
         u_state = GetParticleEnergyMomentum(PI.ODEIntegrator.u)
         #@show u_state
 
-        #PIC.push_to_grid!(S, u_state , index_positions,  weights, G.Nx, G.Ny , periodic_boundary)
+        #PIC.push_to_grid!(S, u_state , index_positions,  weights, G.stats.Nx.N, G.stats.Ny.N , periodic_boundary)
         PIC.push_to_grid!(S, u_state, weights_and_index, G.stats.Nx, G.stats.Ny)
         nothing
 end
@@ -334,7 +335,7 @@ function NodeToParticle!(i::Int64, j::Int64, x::Float64, y::Float64, model::Abst
         wind_min_squared = model.ODEsettings.wind_min_squared
         default_particle = model.ODEdefaults
         e_min_log = model.ODEsettings.log_energy_minimum
-        current_is_boundary = i==0 || i==model.grid.Nx || j==0 || j==model.grid.Ny
+        current_is_boundary = i==0 || i==model.grid.stats.Nx || j==0 || j==model.grid.Ny
 
         # definition of a norm 2
         norm(vec) = sqrt(sum([vec[i]^2 for i in eachindex(vec)]))

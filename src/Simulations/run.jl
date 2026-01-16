@@ -1,9 +1,10 @@
-using ..Operators.core_2D_spread: SeedParticle
+using ..Operators.core_2D_spread: SeedParticle as SeedParticle2D
 using ..Operators.core_2D_spread: ParticleDefaults as ParticleDefaults2D
 using ..Operators.core_1D: ParticleDefaults as ParticleDefaults1D
 
 using ..Operators.core_1D: SeedParticle! as SeedParticle1D!
 using ..Operators.core_2D_spread: SeedParticle! as SeedParticle2D!
+# using ..Operators.core_2D: SeedParticle 
 
 using ..Architectures: Abstract2DModel, Abstract1DModel, Abstract2DStochasticModel
 using ..ParticleMesh: OneDGrid, OneDGridNotes, TwoDGrid, TwoDGridNotes
@@ -37,8 +38,10 @@ end
 function plot_state_and_error_points(wave_simulation, gn)
         plt.plot()
 
+        X = (0:(gn.stats.Nx.N-1)).*gn.stats.dx .+ gn.stats.xmin
+        Y = (0:(gn.stats.Ny.N-1)).*gn.stats.dy .+ gn.stats.ymin
         energy = get_tot_energy_domain(wave_simulation)
-        p1 = plt.heatmap(gn.x, gn.y, transpose(wave_simulation.model.State[:, :, 1]), aspect_ratio=:equal, size=(1080, 1080))#,clim=(0,1))
+        p1 = plt.heatmap(X, Y, transpose(wave_simulation.model.State[:, :, 1]), aspect_ratio=:equal, size=(1080, 1080))#,clim=(0,1))
 
         plt.plot!(legend=:none,
                 title="total energy = "*string(round(energy,digits=3))*"; max = "*string(round(maximum(wave_simulation.model.State[:,:,1]),
@@ -46,8 +49,8 @@ function plot_state_and_error_points(wave_simulation, gn)
                         string(argmax(wave_simulation.model.State[:,:,1])[2])*")",
                 ylabel="y position",
                 xlabel="x position",
-                xlims=(gn.xmin, gn.xmax),
-                ylims=(gn.ymin, gn.ymax)) |> display
+                xlims=(gn.stats.xmin, gn.stats.xmax),
+                ylims=(gn.stats.ymin, gn.stats.ymax)) |> display
 end
 
 function write_particles_to_csv(wave_model)
@@ -89,18 +92,20 @@ main method to run the Simulation sim.
 Needs time_step! to be defined for the model, and push_state_to_storage! to be defined for the store.
 """
 function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
-        save_path = sim.model.plot_savepath
-
-        if sim.model.save_particles
+        @info sim.model.grid.stats
+        if sim.model isa Abstract2DStochasticModel
                 save_path = sim.model.plot_savepath
-                filename = save_path*"/data/simu_infos.csv"
 
-                Nx = sim.model.grid.Nx
-                Ny = sim.model.grid.Ny
-                xmin = sim.model.grid.xmin
-                xmax = sim.model.grid.xmax
-                ymin = sim.model.grid.ymin
-                ymax = sim.model.grid.ymax
+                if sim.model.save_particles
+                save_path = sim.model.plot_savepath
+                filename = save_path*"/data/simu_info.csv"
+
+                Nx = sim.model.grid.stats.Nx.N
+                Ny = sim.model.grid.stats.Ny.N
+                xmin = sim.model.grid.stats.xmin
+                xmax = sim.model.grid.stats.xmax
+                ymin = sim.model.grid.stats.ymin
+                ymax = sim.model.grid.stats.ymax
                 lne_source = sim.model.ODEdefaults.lne
                 c_x_source = sim.model.ODEdefaults.c̄_x
                 c_y_source = sim.model.ODEdefaults.c̄_y
@@ -123,6 +128,7 @@ function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
                 covariance_init = sim.model.proba_covariance_init
                 data2 = DataFrame(covariance_init, :auto)
                 CSV.write(filename2, data2)
+                end
         end
 
         start_time_step = time_ns()
@@ -207,8 +213,7 @@ function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
                 sim.running = sim.stop_time >= sim.model.clock.time ? true : false
 
                 if sim.model.plot_steps
-                        gridnotes = TwoDGridNotes(sim.model.grid)
-                        plot_state_and_error_points(sim, gridnotes)
+                        plot_state_and_error_points(sim, sim.model.grid)
                         sec=string(Int64(floor((sim.model.clock.time)/60)))
                         dec=string(Int64(floor(10*(sim.model.clock.time/60-floor((sim.model.clock.time)/60)))))
                         plt.savefig(joinpath([save_path*"/plots/", "energy_plot_no_spread_"*sec*","*dec*".png"]))
@@ -310,28 +315,30 @@ function init_particles!(model::Abstract2DStochasticModel; defaults::PP=nothing,
                 end
         end
 
-        gridnotes = TwoDGridNotes(model.grid)
+        # gridnotes = TwoDGridNotes(model.grid)
+
+        # SeedParticle_i = SeedParticle_mapper(SeedParticle2D!,
+        #         ParticleCollection, model.State,
+        #         model.ODEsystem, nothing, model.ODEsettings,
+        #         gridnotes, model.winds, model.ODEsettings.timestep,
+        #         model.boundary, model.periodic_boundary)
 
         ParticleCollection = []
-        SeedParticle_i = SeedParticle_mapper(SeedParticle2D!,
-                ParticleCollection, model.State,
-                model.ODEsystem, nothing, model.ODEsettings,
-                gridnotes, model.winds, model.ODEsettings.timestep,
-                model.boundary, model.periodic_boundary)
-
-
-        @info typeof(ParticleCollection)
-
         model.ParticleCollection = ParticleCollection
 
         if defaults isa ParticleDefaults2D
-                i = Int64(floor((defaults.x - model.grid.xmin) / model.grid.dx)) + 1
-                j = Int64(floor((defaults.y - model.grid.ymin) / model.grid.dy)) + 1
-                gridnotes = TwoDGridNotes(model.grid)
+                i = Int64(floor((defaults.x - model.grid.stats.xmin) / model.grid.stats.dx)) + 1
+                j = Int64(floor((defaults.y - model.grid.stats.ymin) / model.grid.stats.dy)) + 1
+                # gridnotes = TwoDGridNotes(model.grid)
                 if model.angular_spreading_type == "nonparametric"
                         if sum(model.proba_covariance_init)==4e-50
                                 # if "nonparametric" is used, initialize a bigger number of particles at the original perturbation
                                 n_part = model.n_particles_launch
+                                ij = CartesianIndices((i,j))
+                                ij_mesh = model.grid.data[ij]
+                                ij_wind = (model.winds.u(ij_mesh.x, ij_mesh.y, 0.0),
+                                                model.winds.v(ij_mesh.x, ij_mesh.y, 0.0)
+                                                )
                                 for _ in 1:n_part
                                         defaults_temp = deepcopy(defaults)
                                         delta_phi = rand() * defaults_temp.angular_σ - 0.5*defaults_temp.angular_σ
@@ -340,10 +347,11 @@ function init_particles!(model::Abstract2DStochasticModel; defaults::PP=nothing,
                                         defaults_temp.lne += -log(n_part)
                                         defaults_temp.c̄_x = c_x
                                         defaults_temp.c̄_y = c_y
-                                        push!(ParticleCollection, SeedParticle(model.State,
+                                        push!(ParticleCollection, SeedParticle2D(model.State,
                                                         (i,j), model.ODEsystem, defaults_temp,
-                                                        model.ODEsettings,gridnotes, model.winds,
-                                                        model.ODEsettings.timestep, model.boundary,
+                                                        model.ODEsettings,
+                                                        model.grid.stats,model.grid.ProjetionKernel,model.grid.PropagationCorrection,
+                                                        ij_mesh[i,j], ij_wind, model.ODEsettings.timestep, model.boundary,
                                                         model.periodic_boundary))
                                 end
                         else
@@ -381,8 +389,8 @@ function init_particles!(model::Abstract2DStochasticModel; defaults::PP=nothing,
                 end
         elseif defaults isa Array{Any,1}
                 for k in 1:length(defaults)
-                        i = Int64(floor((defaults[k].x - model.grid.xmin) / model.grid.dx)) + 1
-                        j = Int64(floor((defaults[k].y - model.grid.ymin) / model.grid.dy)) + 1
+                        i = Int64(floor((defaults[k].x - model.grid.stats.xmin) / model.grid.stats.dx)) + 1
+                        j = Int64(floor((defaults[k].y - model.grid.stats.ymin) / model.grid.stats.dy)) + 1
                         gridnotes = OneDGridNotes(model.grid)
                         push!(ParticleCollection, SeedParticle(model.State,
                                                 (i,j), model.ODEsystem, defaults[k],
@@ -482,7 +490,7 @@ function init_particles!(model::Abstract1DModel; defaults::PP=nothing, verbose::
                 gridnotes, model.winds, model.ODEsettings.timestep,
                 model.boundary, model.periodic_boundary)
 
-        map(SeedParticle_i, range(1, length=model.grid.Nx))
+        map(SeedParticle_i, range(1, length=model.grid.stats.Nx))
 
 
         # print(defaults)

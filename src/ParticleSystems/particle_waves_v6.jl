@@ -31,7 +31,7 @@ Structure to hold all information about the ODE system
 # Fields  
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct ODESettings <: AbstractODESettings
+@with_kw mutable struct ODESettings <: AbstractODESettings
     "ODE parameters (Dict)"
     Parameters::NamedTuple
     "minimum allowed log energy on particle "

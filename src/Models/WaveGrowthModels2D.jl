@@ -1,6 +1,6 @@
 module WaveGrowthModels2D
 
-export WaveGrowth2D, init_particles!
+export WaveGrowth2D, init_particles!, init_StateArray, mark_boundary, reset_boundary!, fields
 export fields
 
 using ...Architectures
@@ -352,11 +352,11 @@ end
 
 Return a flattened `NamedTuple` of the State vector for a `WaveGrowth2D` model.
 """
-fields(model::WaveGrowth2D) = (State=model.State,)
+fields(model::Abstract2DModel) = (State=model.State,)
 # # Oceananigans.Simulations interface
 # fields(m::ContinuumIceModel) = merge(m.velocities, m.stresses)
 
-function reset_boundary!(model::WaveGrowth2D)
+function reset_boundary!(model::Abstract2DModel)
 
     if model.periodic_boundary  # if false, define boundary points here:
         boundary = []

@@ -43,13 +43,13 @@ using .ParticleSystems
 include("FetchRelations.jl")
 using .FetchRelations
 
+include("Grids/Grids.jl")
+using .Grids
+
 include("ParticleMesh.jl")
 include("ParticleInCell.jl")
 using .ParticleMesh
 using .ParticleInCell
-
-include("Grids/Grids.jl")
-using .Grids
 
 include("Operators/Operators.jl")
 include("Simulations/Simulations.jl")

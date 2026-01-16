@@ -2,6 +2,7 @@ module ParticleInCell
 
 using ..Architectures: StateTypeL1, AbstractBoundary
 using Statistics
+using ..Grids.CartesianGrid: TwoDCartesianGridMesh, ProjetionKernel, TwoDCartesianGridStatistics
 
 using SharedArrays
 using StaticArrays
@@ -100,16 +101,16 @@ end
 
 
 """
-compute_weights_and_index(g_pars::TwoDGrid, xp::Float64, yp:: Float64 )
+compute_weights_and_index(g_pars::TwoDCartesianGridMesh, xp::Float64, yp:: Float64 )
 returns indexes and weights for in 2D for single x,y point
 """
-function compute_weights_and_index(g_pars::TwoDGrid, xp::Float64, yp:: Float64 )
+function compute_weights_and_index(g_pars::TwoDCartesianGridMesh, xp::Float64, yp:: Float64 )
     """
     2d wrapper for 1d function
     """
 
-    xp_normed = norm_distance(xp, g_pars.xmin, g_pars.dx)
-    yp_normed = norm_distance(yp, g_pars.ymin, g_pars.dy)
+    xp_normed = norm_distance(xp, g_pars.stats.xmin, g_pars.stats.dx)
+    yp_normed = norm_distance(yp, g_pars.stats.ymin, g_pars.stats.dy)
 
     xi, xw = get_absolute_i_and_w(xp_normed)
     yi, yw = get_absolute_i_and_w(yp_normed)
@@ -122,16 +123,16 @@ end
 
 
 """
-compute_weights_and_index_mininal(g_pars::TwoDGrid, xp::Float64, yp:: Float64 )
+compute_weights_and_index_mininal(g_pars::TwoDCartesianGridMesh, xp::Float64, yp:: Float64 )
 returns indexes and weights as FieldVector for in 2D for single x,y point
 """
-function compute_weights_and_index_mininal(g_pars::TwoDGrid, xp::Float64, yp::Float64)
+function compute_weights_and_index_mininal(g_pars::TwoDCartesianGridMesh, xp::Float64, yp::Float64)
     """
     2d wrapper for 1d function
     """
 
-    xp_normed = norm_distance(xp, g_pars.xmin, g_pars.dx)  # multiples of grid spacing
-    yp_normed = norm_distance(yp, g_pars.ymin, g_pars.dy)  # multiples of grid spacing
+    xp_normed = norm_distance(xp, g_pars.stats.xmin, g_pars.stats.dx)  # multiples of grid spacing
+    yp_normed = norm_distance(yp, g_pars.stats.ymin, g_pars.stats.dy)  # multiples of grid spacing
 
     xi, xw = get_absolute_i_and_w(xp_normed)
     yi, yw = get_absolute_i_and_w(yp_normed)
@@ -175,10 +176,10 @@ end
 #indexes, weights = compute_weights_and_index(grid2d, 10.0, 9.9 )
 
 """
-compute_weights_and_index(g_pars::TwoDGrid, xp::Float64, yp:: Float64 )
+compute_weights_and_index(g_pars::TwoDCartesianGridMesh, xp::Float64, yp:: Float64 )
 returns indexes and weights for in 2D for vectors
 """
-function compute_weights_and_index(grid::TwoDGrid, xp::Vector{Float64}, yp:: Vector{Float64} )
+function compute_weights_and_index(grid::TwoDCartesianGridMesh, xp::Vector{Float64}, yp:: Vector{Float64} )
     """
     returns:
     weight list        2 N X 1 vector of tuples with indices and weights
