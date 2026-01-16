@@ -92,7 +92,6 @@ main method to run the Simulation sim.
 Needs time_step! to be defined for the model, and push_state_to_storage! to be defined for the store.
 """
 function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
-        @info sim.model.grid.stats
         if sim.model isa Abstract2DStochasticModel
                 save_path = sim.model.plot_savepath
 
