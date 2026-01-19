@@ -1,20 +1,20 @@
-module WaveGrowthModels2D
+module GeometricalOpticsModels
 
-export WaveGrowth2D, init_particles!, init_StateArray, mark_boundary, reset_boundary!, fields
+export GeometricalOptics, init_particles!
 export fields
 
 using ...Architectures
 
+using ModelingToolkit: get_states, ODESystem
 
 #using core_1D: MarkedParticleInstance
 using ...ParticleMesh: OneDGrid, OneDGridNotes, TwoDGrid, TwoDGridNotes
 
-using ...Operators.core_2D: ParticleDefaults as ParticleDefaults2D
+using ...Operators.core_2D_spread: ParticleDefaults as ParticleDefaults2D
+#using core_2D: SeedParticle! as SeedParticle2D!
 using ...Operators.mapping_2D
 
 using SharedArrays
-using StaticArrays
-using StructArrays
 # using DistributedArrays
 using Printf
 
@@ -22,30 +22,30 @@ import Oceananigans: fields
 using Oceananigans.TimeSteppers: Clock
 using ...FetchRelations
 
-using ...custom_structures: ParticleInstance2D
+using LinearAlgebra
 
-using ...Grids: make_boundary_lists
-#includet("mapping_1D.jl")
+using ..WaveGrowthModels2D
+# include("WaveGrowthModels2D.jl")
+
+# TO DO : check if all the modules imported above are necessary, for now I just copied the ones from WaveGrowthModels2D.jl
 
 
-
-
-
-"""
-    WaveGrowth2D{Grid, Lay, Tim, Clo, stat, PC, Ovar, Osys, Oses, Odev, bl_flag, bl, wnds, cur}
-
-    WaveGrowth2D is a model for simulating wave growth in a 1D domain. 
-    The model is based on the particle method, where each particle represents wave statistics at a given point in space.
-    This structure contains all the information needed to run the model, including the grid, the particles, the ODE system, the boundary conditions, and the state of the model. 
 
 """
-mutable struct WaveGrowth2D{Grid<:AbstractGrid,
+    GeometricalOptics{Grid, Lay, Tim, Clo, stat, PC, Ovar, Osys, Oses, Odev, bl_flag, bl, wnds, cur}
+
+    ADD HERE A DESCRIPTION OF THE MODEL
+    
+"""
+mutable struct GeometricalOptics{Grid<:AbstractGrid,
                         Lay,
                         Tim,
                         Clo,
                         Int,
                         stat,
+                        Pan,
                         PCollection,
+                        PPool,
                         FPC,
                         Ovar,
                         Osys,
@@ -56,9 +56,16 @@ mutable struct WaveGrowth2D{Grid<:AbstractGrid,
                         bl_flag,
                         bl,
                         bl_type,
+                        as_type,
+                        as_thresh,
+                        pb_cov_init,
+                        plt_steps,
+                        plt_path,
+                        sve_part,
+                        nPart,
                         wnds,
                         cur,
-    Mstat} <: Abstract2DModel where {Mstat<:Union{Nothing,stat},PCollection<:Union{Vector,Array,StructArray}}
+                        Mstat} <: Abstract2DStochasticModel where {Mstat<:Union{Nothing,stat}, PCollection<:Union{Vector,Array}}
     #Union{Vector,DArray}
     grid::Grid
     layers::Lay      # number of layers used in the model, 1 is eneough
@@ -66,8 +73,10 @@ mutable struct WaveGrowth2D{Grid<:AbstractGrid,
     clock::Clo
     dims::Int      # number of dimensions
 
-    State::stat     # state of of the model at each grid point, for each layer it contains, energy, positions, group speed
+    State::stat     # state of of the model at each grid point, for each layer it contains, energy, positions, group speed and directional spreading
+    ParticlesAtNode::Pan      # list of the particles to regrid at each node
     ParticleCollection::PCollection    # Collection (list) of Particles
+    ParticlePool::PPool                 # Pool of particles (used for non parametric mode)
     FailedCollection::FPC      # Collection (list) of Particles that failed to integrate
 
     ODEvars::Ovar     # list of variables in ODE system, have type Num from OrdinaryDiffEq and ModelingToolkit
@@ -80,8 +89,17 @@ mutable struct WaveGrowth2D{Grid<:AbstractGrid,
     periodic_boundary::bl_flag # If true we use a period boundary 
     boundary::bl       # List of boundary points
     boundary_defaults::bl_type # Dict{NUm, Float64} ODE defaults
-    ocean_points::Vector
-    boundary_points::Vector
+
+    angular_spreading_thresh::as_thresh     # threshold for splitting
+    angular_spreading_type::as_type     # type of angular spreading used
+    proba_covariance_init::pb_cov_init     # initial probability density 4x4 covariance matrix of particles
+
+    plot_steps::plt_steps          # Whether or not to plot the steps 
+    plot_savepath::plt_path         # The path to use for saving plots
+
+    save_particles::sve_part        # Whether or not to save particle data
+
+    n_particles_launch::nPart       # Number of particles to launch from each node when using a nonparametric spreading type
 
     winds::wnds     # u, v, if needed u_x, u_y
     currents::cur      # u, v, currents
@@ -95,90 +113,10 @@ end
 
 ## 2D version
 
-"""
-    init_StateArray(grid::TwoDGrid, Nstate, layers)
-
-    # Arguments
-    - `grid::TwoDGrid`: The TwoDGrid object representing the grid.
-    - `Nstate`: The number of states in the StateArray.
-    - `layers`: The number of layers in the StateArray.
-
-    # Returns
-    - `State`: The initialized StateArray.
-
-    If `layers` is greater than 1, a 4-dimensional SharedArray of size (grid.Nx, grid.Ny, Nstate, layers) is created.
-    Otherwise, a 3-dimensional SharedArray of size (grid.Nx, grid.Ny, Nstate) is created.
-"""
-function init_StateArray(grid::TwoDGrid, Nstate, layers)
-    if layers > 1
-        State = SharedArray{Float64,4}(grid.Nx, grid.Ny, Nstate, layers)
-    else
-        State = SharedArray{Float64,3}(grid.Nx, grid.Ny, Nstate)
-    end
-    return State
-end
-
-
-"""
-    init_StateArray(grid::MeshGrids, Nstate, layers)
-
-    # Arguments
-    - `grid::MeshGrids`: The grid object representing the grid.
-    - `Nstate`: The number of states in the StateArray.
-    - `layers`: The number of layers in the StateArray.
-
-    # Returns
-    - `State`: The initialized StateArray.
-
-    If `layers` is greater than 1, a 4-dimensional SharedArray of size (grid.stats.Nx, grid.stats.Ny, Nstate, layers) is created.
-    Otherwise, a 3-dimensional SharedArray of size (grid.stats.Nx, grid.stats.Ny, Nstate) is created.
-"""
-function init_StateArray(grid::MeshGrids, Nstate, layers)
-    if layers > 1
-        State = SharedArray{Float64,4}(grid.stats.Nx.N, grid.stats.Ny.N, Nstate, layers)
-    else
-        State = SharedArray{Float64,3}(grid.stats.Nx.N, grid.stats.Ny.N, Nstate)
-    end
-    return State
-end
-
-
-"""
-mark_boundary(grid::TwoDGrid)
-function that returns list of boundary nodes (tuples of indixes)
-"""
-function mark_boundary(grid::TwoDGrid)
-    #get x and y coordinates
-    xi = collect(range(1, stop=grid.Nx, step=1))
-    yi = collect(range(1, stop=grid.Ny, step=1))
-
-    # make boundary nodes
-    a = [(xi[i], yi[j]) for j in 1:grid.Ny   , i in [1, grid.Nx]]
-    b = [(xi[i], yi[j]) for j in [1, grid.Ny], i in 1:grid.Nx   ]
-    #merge a and b
-    return vcat(vec(a), vec(b)) #vec(vcat(a, b))
-end
-
-
-"""
-mark_boundary(grid::MeshGrids)
-function that returns list of boundary nodes (tuples of indixes)
-"""
-function mark_boundary(grid::MeshGrids)
-    #get x and y coordinates
-    xi = collect(range(1, stop=grid.stats.Nx.N, step=1))
-    yi = collect(range(1, stop=grid.stats.Ny.N, step=1))
-
-    # make boundary nodes
-    a = [(xi[i], yi[j]) for j in 1:grid.stats.Ny.N, i in [1, grid.stats.Nx.N]]
-    b = [(xi[i], yi[j]) for j in [1, grid.stats.Ny.N], i in 1:grid.stats.Nx.N]
-    #merge a and b
-    return [CartesianIndex(i) for i in vcat(vec(a), vec(b))] #vec(vcat(a, b))
-end
 
 """  
-WaveGrowth2D(; grid, winds, ODEsys, ODEvars, layers, clock, ODEsets, ODEdefaults, currents, periodic_boundary, CBsets)
-This is the constructor for the WaveGrowth2D model. The inputs are:
+GeometricalOptics(; grid, winds, ODEsys, ODEvars, layers, clock, ODEsets, ODEdefaults, currents, periodic_boundary, CBsets)
+    This is the constructor for the GeometricalOptics model. The inputs are:
     grid             : the grid used in the model,
     winds            : the wind interpolation function here only 1D,
     ODEsys           : the ODE system used in the model,
@@ -191,12 +129,12 @@ This is the constructor for the WaveGrowth2D model. The inputs are:
     periodic_boundary: if true we use a periodic boundary (default true),
     CBsets           : the callback settings (not implimented yet).
 """
-function WaveGrowth2D(; grid::GG,
+function GeometricalOptics(; grid::GG,
     winds::NamedTuple{(:u, :v)}, 
     ODEsys, 
     ODEvars=nothing, #needed for MTK for ODEsystem. will be depriciated later
     layers::Int=1,
-    clock=Clock{eltype(grid)}(time=0.0),
+    clock=Clock{eltype(grid)}(;time=0, last_Δt=0, last_stage_Δt=1),
     ODEsets::AbstractODESettings=nothing,  # ODE_settings
     ODEinit_type::PP= "wind_sea",  # default_ODE_parameters
     minimal_particle=nothing, # minimum particle the model falls back to if a particle fails to integrate
@@ -204,21 +142,48 @@ function WaveGrowth2D(; grid::GG,
     currents=nothing,  # 
     periodic_boundary=true,
     boundary_type="same", # or "minimal", "same", default is same, only used if periodic_boundary is false
+    angular_spreading_thresh=π/8,
+    angular_spreading_type="stochast",  # or "geometrical" or "nonparametric"
+    proba_covariance_init = Matrix(I,4,4)*10^(-50),
+    plot_steps=false,
+    plot_savepath="",
+    save_particles=false,
+    n_particles_launch=150,
     CBsets=nothing,
     movie=false) where {PP<:Union{ParticleDefaults2D,String},GG<:AbstractGrid}
 
     # initialize state {SharedArray} given grid and layers
     # Number of state variables 
-    Nstate = 3
+    Nstate = 4
     State = init_StateArray(grid, Nstate, layers)
-
-    # depriciated for new Grid logic
     # if layers > 1
-    #     State = SharedArray{Float64,4}(grid.Nx, grid.Ny, Nstate, layers)
+    #     State = SharedArray{Float64,4}(grid.stats.Nx.N, grid.stats.Ny.N, Nstate, layers)
     # else
-    #     State = SharedArray{Float64,3}(grid.Nx, grid.Ny, Nstate) # StateTypeL1
-    #     #State = @MArray zeros(grid.Nx, grid.Ny, Nstate)
+    #     State = SharedArray{Float64,3}(grid.stats.Nx.N, grid.stats.Ny.N, Nstate)
     # end
+
+    if layers > 1
+        ParticlesAtNode = Array{Array{Array{Array{Any,1},1},1},1}()
+        for i in 1:grid.stats.Nx.N
+            push!(ParticlesAtNode, [])
+            for j in 1:grid.stats.Ny.N
+                push!(ParticlesAtNode[i], [])
+                for _ in 1:layers
+                    push!(ParticlesAtNode[i][j], [])
+                end
+            end
+        end
+        ParticlePool = Array{Array{Any,1},1}()
+    else
+        ParticlesAtNode = Array{Array{Array{Any,1},1},1}()
+        for i in 1:grid.stats.Nx.N
+            push!(ParticlesAtNode, [])
+            for _ in 1:grid.stats.Ny.N
+                push!(ParticlesAtNode[i], [])
+            end
+        end
+        ParticlePool = Array{Any,1}()
+    end
 
     if ODEinit_type isa ParticleDefaults2D
         ODEdefaults = ODEinit_type
@@ -229,7 +194,6 @@ function WaveGrowth2D(; grid::GG,
     else
         error("ODEinit_type must be either 'wind_sea','mininmal', or ParticleDefaults2D instance ")
     end
-
 
     if isnothing(minimal_particle)
         @info "initalize minimum particle"
@@ -252,32 +216,14 @@ function WaveGrowth2D(; grid::GG,
         boundary = []
     end
 
-    # create grid points lists.
-    Glists = make_boundary_lists(grid.data.mask)
-    if periodic_boundary
-        # all wave points to concider:
-        ocean_points = vcat(Glists.ocean, Glists.grid_boundary)
-
-        # all boundary points to concider
-        boundary_points = Glists.land_boundary
-    else
-        # all wave points to concider:
-        ocean_points= Glists.ocean
-
-        # all boundary points to concider
-        boundary_points = vcat(Glists.land_boundary, Glists.grid_boundary)
-
-    end
-
-
     if boundary_type == "wind_sea"
         boundary_defaults = nothing
         @info "use wind_sea boundary"
     elseif boundary_type == "mininmal"
         @info "use 'mininmal' boundary (1min with 2m/s)"
-        #FetchRelations.MinimalWindsea(u(0, 0), ODEsets.DT)
-        WindSeamin = FetchRelations.MinimalWindsea(1, 1, 5*60) # 5 min with 2 m/s
-        #WindSeamin = FetchRelations.MinimalWindsea(u(0, 0, 0), v(0, 0, 0), DT / 2)
+        #FetchRelations.get_minimal_windsea(u(0, 0), ODEsets.DT)
+        WindSeamin = FetchRelations.get_minimal_windsea(1, 1, 5*60) # 5 min with 2 m/s
+        #WindSeamin = FetchRelations.get_minimal_windsea(u(0, 0, 0), v(0, 0, 0), DT / 2)
         #WindSeamin = FetchRelations.get_initial_windsea(u(0, 0, 0), v(0, 0, 0), DT/5)
         lne_local = log(WindSeamin["E"])
         cg_u_local = WindSeamin["cg_bar_x"]
@@ -291,19 +237,7 @@ function WaveGrowth2D(; grid::GG,
         error("boundary_type must be either 'wind_sea','mininmal', or 'same' ")
     end
 
-
-    if typeof(grid) <: MeshGrids
-        Nx, Ny = grid.stats.Nx.N, grid.stats.Ny.N
-    elseif typeof(grid) <: StandardRegular2D_old
-        Nx, Ny = grid.Nx, grid.Ny
-        # @info "WaveGrowthModel: StandardRegular2D_old"
-    else
-        @info "WaveGrowthModel: no grid detected"
-    end
-
-
-    # ParticleCollection = []
-    ParticleCollection = StructArray{ParticleInstance2D}(undef, Nx, Ny)
+    ParticleCollection = []
     FailedCollection = Vector{AbstractMarkedParticleInstance}([])
     # particle initialization is  not done in the init_particle! method
     # for i in range(1,length = grid.Nx)
@@ -321,14 +255,16 @@ function WaveGrowth2D(; grid::GG,
     end
 
     # return WaveGrowth2D structure
-    return WaveGrowth2D(
+    return GeometricalOptics(
         grid,
         layers,
         nothing,
         clock, # ???
         2, # This is a 2D model
         State,
+        ParticlesAtNode,
         ParticleCollection,
+        ParticlePool,
         FailedCollection, 
         ODEvars,
         ODEsys,
@@ -338,7 +274,13 @@ function WaveGrowth2D(; grid::GG,
         minimal_state,
         periodic_boundary,
         boundary, boundary_defaults,
-        ocean_points, boundary_points,
+        angular_spreading_thresh,
+        angular_spreading_type,
+        proba_covariance_init,
+        plot_steps,
+        plot_savepath,
+        save_particles,
+        n_particles_launch,
         winds,
         currents,
         Mstat)
@@ -347,30 +289,14 @@ end
 
 
 
-"""
-    fields(model::WaveGrowth)
+function Base.show(io::IO, ow::GeometricalOptics)
 
-Return a flattened `NamedTuple` of the State vector for a `WaveGrowth2D` model.
-"""
-fields(model::Abstract2DModel) = (State=model.State,)
-# # Oceananigans.Simulations interface
-# fields(m::ContinuumIceModel) = merge(m.velocities, m.stresses)
-
-function reset_boundary!(model::Abstract2DModel)
-
-    if model.periodic_boundary  # if false, define boundary points here:
-        boundary = []
+    if ow.ODEsystem isa ODESystem
+        sys_print = get_states(ow.ODEsystem)
     else
-        boundary = boundary = mark_boundary(grid)
+        sys_print = ow.ODEsystem
     end
-
-end
-
-
-function Base.show(io::IO, ow::WaveGrowth2D)
-
-    sys_print = ow.ODEsystem
-    print(io, "WaveGrowth2D ", "\n",
+    print(io, "GeometricalOptics ", "\n",
         "├── grid: ", ow.grid, "\n",
         "├── layers: ", ow.layers, "\n",
         "├── clock: ", ow.clock,
