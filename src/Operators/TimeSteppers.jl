@@ -140,7 +140,7 @@ clock is ticked by Δt
 callbacks are not implimented yet
 
 """
-function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, debug=false)
+function time_step!(model::Abstract2DStochasticModel, Δt::Float64; callbacks=nothing, debug=false)
 
     # temporary FailedCollection to store failed particles
     FailedCollection = Vector{AbstractMarkedParticleInstance}([])
@@ -316,6 +316,65 @@ function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, deb
             mapping_2D.remesh!(i, j, model, Δt)
         end
         """
+    end
+
+    if debug
+        @info "remeshed: "
+        #@info model.State[8:12, 1], model.State[8:12, 2]
+        @info maximum(model.State[:, :, 1]), maximum(model.State[:, :, 2]), maximum(model.State[:, :, 3])
+        @info model.clock.time, model.ParticleCollection[10].ODEIntegrator.t
+
+    end
+    #print("mean energy after remesh ", mean_of_state(model), "\n")
+
+    # @printf("------- max state E=%.4e cgx=%.4e cgy=%.4e \n", max_energy(model), max_cgx(model), max_cgy(model))
+    tick!(model.clock, Δt)
+
+
+end
+
+function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, debug=false)
+
+    # temporary FailedCollection to store failed particles
+    FailedCollection = Vector{AbstractMarkedParticleInstance}([])
+
+    #print("mean energy before advance ", mean_of_state(model), "\n")
+    if debug
+        @info "before advance"
+        @info maximum(model.State[:, :, 1]), maximum(model.State[:, :, 2]), maximum(model.State[:, :, 3])
+        model.FailedCollection = FailedCollection
+    end
+
+    time_step!_advance(model, Δt, FailedCollection)
+    # @threads for a_particle in model.ParticleCollection[model.ocean_points]
+    #     #@info a_particle.position_ij
+    #     mapping_2D.advance!(    a_particle, model.State, FailedCollection,
+    #                             model.grid, model.winds, Δt,
+    #                             model.ODEsettings.log_energy_maximum,
+    #                             model.ODEsettings.wind_min_squared,
+    #                             model.periodic_boundary,
+    #                             model.ODEdefaults)
+    # end
+
+
+    if debug
+        print("mean energy after advance ", mean_of_state(model), "\n")
+
+        @info "advanced: "
+        @info maximum(model.State[:, :, 1]), maximum(model.State[:, :, 2]), maximum(model.State[:, :, 3])
+        #@info model.State[8:12, 1], model.State[8:12, 2]
+        @info model.clock.time, model.ParticleCollection[10].ODEIntegrator.t
+        @info "winds:", model.winds.u(model.ParticleCollection[10].ODEIntegrator.u[4], model.ParticleCollection[10].ODEIntegrator.u[5], model.ParticleCollection[10].ODEIntegrator.t)
+    end
+
+    #@printf "re-mesh"
+    @threads for a_particle in model.ParticleCollection[model.ocean_points]
+        mapping_2D.remesh!(a_particle, model.State, 
+                        model.winds, model.clock.time, 
+                        model.ODEsettings, Δt,
+                        model.grid.stats, 
+                        model.minimal_state,
+                        model.ODEdefaults)
     end
 
     if debug

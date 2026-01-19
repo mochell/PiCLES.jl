@@ -1,4 +1,5 @@
-using ..Operators.core_2D_spread: SeedParticle as SeedParticle2D
+using ..Operators.core_2D_spread: SeedParticle as StochasticSeedParticle2D
+using ..Operators.core_2D: SeedParticle as SeedParticle2D
 using ..Operators.core_2D_spread: ParticleDefaults as ParticleDefaults2D
 using ..Operators.core_1D: ParticleDefaults as ParticleDefaults1D
 
@@ -136,8 +137,10 @@ function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
                 initialize_simulation!(sim)
         end
 
-        if sim.model.save_particles && length(sim.model.ParticleCollection) > 0
-                write_particles_to_csv(sim.model)
+        if sim.model isa Abstract2DStochasticModel
+                if sim.model.save_particles && length(sim.model.ParticleCollection) > 0
+                        write_particles_to_csv(sim.model)
+                end
         end
 
         #sim.running = true
@@ -211,13 +214,14 @@ function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
                 end
                 sim.running = sim.stop_time >= sim.model.clock.time ? true : false
 
-                if sim.model.plot_steps
-                        plot_state_and_error_points(sim, sim.model.grid)
-                        sec=string(Int64(floor((sim.model.clock.time)/60)))
-                        dec=string(Int64(floor(10*(sim.model.clock.time/60-floor((sim.model.clock.time)/60)))))
-                        plt.savefig(joinpath([save_path*"/plots/", "energy_plot_no_spread_"*sec*","*dec*".png"]))
+                if sim.model isa Abstract2DStochasticModel
+                        if sim.model.plot_steps
+                                plot_state_and_error_points(sim, sim.model.grid)
+                                sec=string(Int64(floor((sim.model.clock.time)/60)))
+                                dec=string(Int64(floor(10*(sim.model.clock.time/60-floor((sim.model.clock.time)/60)))))
+                                plt.savefig(joinpath([save_path*"/plots/", "energy_plot_no_spread_"*sec*","*dec*".png"]))
+                        end
                 end
-
         end
 
         end_time_step = time_ns()
@@ -346,7 +350,7 @@ function init_particles!(model::Abstract2DStochasticModel; defaults::PP=nothing,
                                         defaults_temp.lne += -log(n_part)
                                         defaults_temp.c̄_x = c_x
                                         defaults_temp.c̄_y = c_y
-                                        push!(ParticleCollection, SeedParticle2D(model.State,
+                                        push!(ParticleCollection, StochasticSeedParticle2D(model.State,
                                                         (i,j), model.ODEsystem, defaults_temp,
                                                         model.ODEsettings,
                                                         model.grid.stats,model.grid.ProjetionKernel,model.grid.PropagationCorrection,
