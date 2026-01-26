@@ -1,7 +1,7 @@
 module particle_waves_v4
 
 #@info "Loading ModelingToolkit"
-using ModelingToolkit
+# using ModelingToolkit
 #@info "Loading DifferentialEquations"
 using DifferentialEquations, IfElse
 

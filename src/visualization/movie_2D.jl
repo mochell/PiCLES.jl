@@ -1,7 +1,7 @@
 module movie
 
 
-using GLMakie
+using CairoMakie
 using ...ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
 using ...Operators.core_2D: GetGroupVelocity
 

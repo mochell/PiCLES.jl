@@ -1,6 +1,7 @@
 module particle_waves_v3
 
-using ModelingToolkit, DifferentialEquations
+# using ModelingToolkit, DifferentialEquations
+using DifferentialEquations
 
 using ...Architectures: AbstractODESettings
 
