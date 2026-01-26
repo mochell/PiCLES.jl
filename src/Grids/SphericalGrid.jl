@@ -162,8 +162,8 @@ end
 
 function TwoDSphericalGridMesh(grid::SphericalGridStatistics; mask=nothing, total_mask=nothing)
 
-    x = collect(range(grid.xmin, stop=grid.xmax, step=grid.dx_deg))
-    y = collect(range(grid.ymin, stop=grid.ymax, step=grid.dy_deg))
+    x = collect(range(grid.xmin, stop=grid.xmax, length=grid.Nx.N))
+    y = collect(range(grid.ymin, stop=grid.ymax, length=grid.Ny.N))
 
     XX = transpose(reshape(repeat(x, inner=length(y)), length(y), length(x)))
     YY = transpose(reshape(repeat(y, outer=length(x)), length(y), length(x)))
