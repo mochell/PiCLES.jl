@@ -4,7 +4,8 @@ using Pkg
 Pkg.activate("PiCLES/")
 
 import Plots as plt
-using Setfield, IfElse
+# using Netfield 
+using IfElse
 
 using PiCLES.ParticleSystems: particle_waves_v5 as PW
 
@@ -205,7 +206,7 @@ for i in 1:1:100
 
 end
 
-
+# using Makie
 fig = PlotState_DoubleGlobeSeam(wave_simulation.model, scaled=false)
 #Makie.save(joinpath(plot_path_base, subtitle * "_shift_sphere.png"), fig)
 
@@ -223,7 +224,7 @@ particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q,
 
 # default_windsea = FetchRelations.get_initial_windsea(U10*0.1, V10*0.1, DT, particle_state=true)
 
-using Makie
+
 Revise.retry()
 for (u10, v10, name) in [
     (5.0, 0.0, "zonal"),
