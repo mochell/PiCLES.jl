@@ -18,7 +18,7 @@ end
 
 
 """ sets particle state values to S. position is taking from particle """
-function set_u_to_shared!(S::StateTypeL1, PI::ParticleInstance2D)
+function set_u_to_shared!(S::StateTypeL1, PI::AbstractParticleInstance)
         S[ PI.position_ij[1], PI.position_ij[2] , :] = PI.ODEIntegrator.u
         nothing
 end

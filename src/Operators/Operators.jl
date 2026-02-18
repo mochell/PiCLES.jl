@@ -1,6 +1,6 @@
 module Operators
 
-export core_1D, core_2D, custom_structures, mapping_1D, mapping_2D, TimeSteppers
+export core_1D, core_2D, core_2D_spread, custom_structures, mapping_1D, mapping_2D, TimeSteppers
 export init_z0_to_State!
 using SharedArrays
 using StaticArrays
@@ -24,6 +24,7 @@ include("utils.jl")
 include("initialize.jl")
 include("core_1D.jl")
 include("core_2D.jl")
+include("core_2D_spread.jl")
 
 include("mapping_1D.jl")
 include("mapping_2D.jl")
@@ -34,6 +35,7 @@ include("TimeSteppers.jl")
 
 using .core_1D
 using .core_2D
+using .core_2D_spread
 using .mapping_1D
 using .mapping_2D
 using .TimeSteppers
