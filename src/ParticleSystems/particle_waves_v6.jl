@@ -436,11 +436,25 @@ function particle_equations(u_wind, v_wind; γ::Number=0.88, q::Number=-1 / 4.0,
 
             #particle_equations::Vector{Number} = [
             # energy
-            dz[1] = +ωₚ .* r_g^2 .* S_cg_tilde + ωₚ .* (Ĩ - D̃) #- c̄ .* G_n,
+            dz[1] = +ωₚ .* r_g .* S_cg_tilde + ωₚ .* (Ĩ - D̃) #- c̄ .* G_n,
 
             # peak group velocity vector
-            dz[2] = -c̄_x .* ωₚ .* r_g^2 .* S_cg_tilde + c̄_y .* S_dir_tilde #* (-1),
-            dz[3] = -c̄_y .* ωₚ .* r_g^2 .* S_cg_tilde - c̄_x .* S_dir_tilde #* (1),
+            # @info ""
+            # @info "c̄_x = " * string(c̄_x)
+            # @info "ωₚ = " * string(ωₚ)
+            # @info "r_g = " * string(r_g)
+            # @info "S_cg_tilde = " * string(S_cg_tilde)
+            # @info "c̄_y = " * string(c̄_y)
+            # @info "S_dir_tilde = " * string(S_dir_tilde)
+            # total_x = -c̄_x .* ωₚ .* r_g .* S_cg_tilde + c̄_y .* S_dir_tilde
+            # total_y = -c̄_y .* ωₚ .* r_g .* S_cg_tilde - c̄_x .* S_dir_tilde
+            # total_tot = sqrt(total_x^2+total_y^2)
+            # @info "total_x = " * string(total_x)
+            # @info "total_y = " * string(total_y)
+            # @info "total_tot = " * string(total_tot)
+            # @info ""
+            dz[2] = -c̄_x .* ωₚ .* r_g .* S_cg_tilde + c̄_y .* S_dir_tilde #* (-1),
+            dz[3] = -c̄_y .* ωₚ .* r_g .* S_cg_tilde - c̄_x .* S_dir_tilde #* (1),
 
             # D(c̄_x) ~ -c̄_x .* ωₚ .* r_g^2 .* S_cg_tilde + (c̄_y + 0.001) .* S_dir_tilde, #* (-1),
             # D(c̄_y) ~ -c̄_y .* ωₚ .* r_g^2 .* S_cg_tilde - (c̄_x  + 0.001) .* S_dir_tilde, #* (1),

@@ -47,8 +47,11 @@ Const_ID = PW.get_I_D_constant()
 @set Const_ID.γ = 0.88
 Const_Scg = PW.get_Scg_constants(C_alpha=- 1.41, C_varphi=1.81e-5)
 
-u_func(x, y, t) = 0.
-v_func(x, y, t) = 0.
+wind_angle = 3/8*pi
+wind_magnitude = 20
+
+u_func(x, y, t) = wind_magnitude*cos(wind_angle)
+v_func(x, y, t) = wind_magnitude*sin(wind_angle)
 
 u(x, y, t) = u_func(x, y, t)
 v(x, y, t) = v_func(x, y, t)
@@ -65,7 +68,7 @@ Revise.retry()
 
 # define variables based on particle equation
 
-particle_system = PW.particle_equations(u, v, γ=0.88, q=Const_ID.q, input=true, dissipation=false, peak_shift=false);
+particle_system = PW.particle_equations(u, v, γ=0.88, q=Const_ID.q, input=true, dissipation=false, peak_shift=true);
 
 # define V4 parameters absed on Const NamedTuple:
 default_ODE_parameters = (r_g = r_g0, C_α = Const_Scg.C_alpha, 
@@ -93,7 +96,7 @@ ODE_settings    = PW.ODESettings(
     save_everystep=false)
 
 
-default_particle = ParticleDefaults(1, 0.0, 22, 112500, 15000., π)
+default_particle = ParticleDefaults(5, 0.0, 5.0, 112500., 112500., 2*π)
 Revise.retry()
 
 wave_model = GeometricalOpticsModels.GeometricalOptics(; grid=grid,
@@ -115,7 +118,7 @@ wave_model = GeometricalOpticsModels.GeometricalOptics(; grid=grid,
     n_particles_launch=150
     )
 
-wave_simulation = Simulation(wave_model, Δt=0.75minutes, stop_time=60minutes)
+wave_simulation = Simulation(wave_model, Δt=0.75minutes, stop_time=75minutes)
 initialize_simulation!(wave_simulation)
 
 

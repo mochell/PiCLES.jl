@@ -60,7 +60,7 @@ function write_particles_to_csv(wave_model)
         save_path = wave_model.plot_savepath
 
         nParticles = wave_model.n_particles_launch
-        @info wave_model.clock.time/60
+        # @info wave_model.clock.time/60
 
         parts = wave_model.ParticleCollection[(end-nParticles+1):end]
 
@@ -180,6 +180,14 @@ function run!(sim; store=false, pickup=false, cash_store=false, debug=false)
                         sim.model.State .= 0.0
                 end
                 # do time step
+
+                # l = length(sim.model.ParticleCollection)
+                # Uxs = [sim.model.ParticleCollection[k].ODEIntegrator.u[2] for k in 1:l]
+                # Uys = [sim.model.ParticleCollection[k].ODEIntegrator.u[3] for k in 1:l]
+                # maxUxs = maximum(Uxs)
+                # maxUys = maximum(Uys)
+                # @info "maximum(Uxs) = " * string(maxUxs) * "   and maximum(Uys) = " * string(maxUys)
+                # @info "percentage of cell travelled : on x = " * string(maxUxs * sim.Δt / sim.model.grid.stats.dx) * "    and on y = " * string(maxUys * sim.Δt / sim.model.grid.stats.dy)
 
                 time_step!(sim.model, sim.Δt, debug=debug)
 

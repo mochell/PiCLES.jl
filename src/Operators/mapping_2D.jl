@@ -199,9 +199,13 @@ function advance!(PI::AbstractStochasticParticleInstance,
         if PI.on #& ~PI.boundary # if Particle is on and not boundary
         
                 try
-                        PI.ODEIntegrator.u[4] += DT*PI.ODEIntegrator.u[2]
-                        PI.ODEIntegrator.u[5] += DT*PI.ODEIntegrator.u[3]
-                        # step!(PI.ODEIntegrator, DT, true)
+                        # PI.ODEIntegrator.u[4] += DT*PI.ODEIntegrator.u[2]
+                        # PI.ODEIntegrator.u[5] += DT*PI.ODEIntegrator.u[3]
+                        before = sqrt(PI.ODEIntegrator.u[2]^2+PI.ODEIntegrator.u[2]^2)
+                        @info PI
+                        step!(PI.ODEIntegrator, DT, true)
+                        after = sqrt(PI.ODEIntegrator.u[2]^2+PI.ODEIntegrator.u[2]^2)
+                        # @info after/before
                 catch e
                         @printf "error on advancing ODE:\n"
                         print("- time after fail $(PI.ODEIntegrator.t)\n ")

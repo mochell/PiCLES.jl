@@ -273,7 +273,7 @@ function InitParticleValues(
                         #c̄_x = u_min[2]
                         #c̄_y = u_min[3]
                         
-                        particle_on = false
+                        particle_on = true
                 end        
                 
                 # initialize particle instance based on above devfined values
