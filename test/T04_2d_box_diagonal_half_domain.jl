@@ -20,6 +20,7 @@ using PiCLES.Operators.TimeSteppers: time_step!, movie_time_step!
 
 using PiCLES.ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
 using PiCLES.Models.WaveGrowthModels2D
+using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjetionKernel, TwoDCartesianGridStatistics
 
 using Oceananigans.TimeSteppers: Clock, tick!
 import Oceananigans: fields
@@ -81,9 +82,11 @@ v(x, y, t) = v_func(x, y, t)
 winds = (u=u, v=v)
 
 
-grid = TwoDGrid(100e3, 51, 100e3, 51)
-mesh = TwoDGridMesh(grid, skip=1);
-gn = TwoDGridNotes(grid);
+# grid = TwoDGrid(100e3, 51, 100e3, 51)
+# mesh = TwoDGridMesh(grid, skip=1);
+# gn = TwoDGridNotes(grid);
+
+grid = TwoDCartesianGridMesh(100e3, 51, 100e3, 51, periodic_boundary=(false, true))
 
 # heatmap( v.(mesh.x, mesh.y, 0) )
 

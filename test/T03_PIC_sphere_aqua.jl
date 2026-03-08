@@ -221,6 +221,8 @@ particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q,
     direction=true,
 );
 
+# %%
+
 # default_windsea = FetchRelations.get_initial_windsea(U10*0.1, V10*0.1, DT, particle_state=true)
 
 using Makie
@@ -269,6 +271,7 @@ end
 
 
 # %%
+
 
  fig = Figure(size=(900, 500), fontsize=22)
 OrthographicTwoMapsSeam(fig,gridd.data.x, gridd.data.y, gridd.data.angle_dx) 
