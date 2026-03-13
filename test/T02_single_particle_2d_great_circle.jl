@@ -2,7 +2,7 @@
 using Pkg
 Pkg.activate("PiCLES/")
 
-using DifferentialEquations
+#using OrdinaryDiffEq
 using Plots
 using Setfield
 using IfElse

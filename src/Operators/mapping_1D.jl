@@ -1,7 +1,7 @@
 module mapping_1D
 
 using SharedArrays
-using DifferentialEquations
+#using OrdinaryDiffEq
 using Printf
 
 using ...ParticleMesh: OneDGrid, OneDGridNotes

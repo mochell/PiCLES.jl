@@ -1,6 +1,6 @@
 ENV["JULIA_INCREMENTAL_COMPILE"]=true
 using Pkg
-Pkg.activate(".")
+Pkg.activate("PiCLES/")
 
 #using Plots
 import Plots as plt
@@ -17,13 +17,15 @@ using PiCLES.Operators.TimeSteppers: time_step!, movie_time_step!
 using PiCLES.ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
 using PiCLES.Models.WaveGrowthModels2D
 
+using PiCLES
+
 using Oceananigans.TimeSteppers: Clock, tick!
 import Oceananigans: fields
 using Oceananigans.Units
 import Oceananigans.Utils: prettytime
 
 using PiCLES.Architectures
-using GLMakie
+# using GLMakie
 
 using PiCLES.Operators.core_2D: GetGroupVelocity, speed
 using PiCLES.Plotting.movie: init_movie_2D_box_plot
@@ -41,7 +43,7 @@ U10,V10           = 10.0, 10.0
 dt_ODE_save       = 30minutes
 DT                = 30minutes
 # version 3
-
+r_g0 = 0.85
 
 # function to define constants 
 
@@ -53,8 +55,8 @@ ODEpars, Const_ID, Const_Scg = PW.ODEParameters(r_g=0.85)
 # v(x, y, t) = 0.01 - V10 * cos(t / (6*60*60 * 2π) ) * sin(x / 50e3) * sin(y / 50e3)
 u_std= 2e3 *1
 v_std= 2e3 *1
-u_func(x, y, t) = U10  * exp( - (x - 5e3)^2/ u_std^2) * exp( - (y - 5e3)^2/ v_std^2) *  sin(t*2 / (1 * 60 * 60 * 2π))
-v_func(x, y, t) = V10  * exp( - (x - 5e3)^2/ u_std^2) * exp( - (y - 5e3)^2/ v_std^2) *  cos(t*2 / (1 * 60 * 60 * 2π) )   
+# u_func(x, y, t) = U10  * exp( - (x - 5e3)^2/ u_std^2) * exp( - (y - 5e3)^2/ v_std^2) *  sin(t*2 / (1 * 60 * 60 * 2π))
+# v_func(x, y, t) = V10  * exp( - (x - 5e3)^2/ u_std^2) * exp( - (y - 5e3)^2/ v_std^2) *  cos(t*2 / (1 * 60 * 60 * 2π) )   
 
 # u_func(x, y, t) = 0.1 + IfElse.ifelse.( sin(t * 6 / (1 * 60 * 60 * 2π)) > 0 , 
 #                 sin(t * 6 / (1 * 60 * 60 * 2π)) *U10 * exp(-(x - 5e3)^2 / u_std^2) * exp(-(y - 5e3)^2 / v_std^2),
@@ -63,8 +65,8 @@ v_func(x, y, t) = V10  * exp( - (x - 5e3)^2/ u_std^2) * exp( - (y - 5e3)^2/ v_st
 #                             0.0,
 #                             -0.0)
 
-# u_func(x, y, t) = IfElse.ifelse.(x .< 5e3, U10, 0.2) + y * 0 + t * 0
-# v_func(x, y, t) = (IfElse.ifelse.(x .< 5e3, V10, 0.2) + y * 0) .* cos(t * 3 / (1 * 60 * 60 * 2π))
+u_func(x, y, t) = IfElse.ifelse.(x .< 5e3, U10, 0.2) + y * 0 + t * 0
+v_func(x, y, t) = (IfElse.ifelse.(x .< 5e3, V10, 0.2) + y * 0) .* cos(t * 3 / (1 * 60 * 60 * 2π))
 
 # this shuold hopefully work
 # u(x, y, t) = x * 0 + y * 0 + t * 0/ DT + 5.0
@@ -84,9 +86,8 @@ typeof(winds.u(1e3, 1e3, 11))
 # typeof(winds.u(x, y, t))
 # %%
 
-grid = TwoDGrid(10e3, 31, 10e3, 31)
-mesh = TwoDGridMesh(grid, skip=1);
-gn = TwoDGridNotes(grid);
+grid = PiCLES.Grids.CartesianGrid.TwoDCartesianGridMesh(12e3, 35, 10e3, 31)
+
 
 #heatmap( v.(mesh.x, mesh.y, 0) )
 
@@ -118,15 +119,15 @@ ODE_settings    = PW.ODESettings(
     log_energy_minimum=lne_local,#log(FetchRelations.Eⱼ(0.1, DT)),
     #maximum energy threshold
     log_energy_maximum=log(27),#log(17),  # correcsponds to Hs about 16 m
+    solver  = nothing,
     saving_step=dt_ODE_save,
     timestep=DT,
     total_time=T=6days,
-    adaptive=true,
+    reltol  = 1e-3,
+    abstol  = 1e-4,
     dt=1e-3, #60*10, 
     dtmin=1e-4, #60*5, 
-    force_dtmin=true,
-    callbacks=nothing,
-    save_everystep=false)
+    dtmax=10minutes)
 
 
 default_particle = ParticleDefaults(lne_local, cg_u_local, cg_v_local, 0.0, 0.0)
@@ -160,23 +161,27 @@ wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
 
 
 ### build Simulation
-#wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=4hours)#1hours)
-wave_simulation = Simulation(wave_model, Δt=20minutes, stop_time=1hour)#1hours)
+wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=12hours)#1hours)
+# wave_simulation = Simulation(wave_model, Δt=20minutes, stop_time=1hour)#1hours)
 initialize_simulation!(wave_simulation)
-
 
 #init_state_store!(wave_simulation, save_path)
 #wave_simulation.model.MovieState = wave_simulation.model.State
 
-@time run!(wave_simulation, cash_store=true, debug=true)
+
+#@time 
+run!(wave_simulation, cash_store=true, debug=false)
 #reset_simulation!(wave_simulation)
 # run simulation
 #ProfileView.@profview run!(wave_simulation, cash_store=true, debug=true)
 
 
-istate = wave_simulation.store.store[5];
-p1 = plt.heatmap(gn.x / 1e3, gn.y / 1e3, istate[:, :, 1])
+# %%
 
+istate = wave_simulation.store.store[74];
+#p1 = plt.heatmap(grid.data.x / 1e3, grid.data.y / 1e3, istate[:, :, 1])
+p1 = plt.heatmap(istate[:, :, 3]')
+display(p1)
 
 # %%
 # show all Failed particles
@@ -192,7 +197,7 @@ DD_stats = ParticleTools.ParticleStatsToDataframe(wave_simulation.model.FailedCo
 function plot_state_and_error_points(wave_simulation, FailedTable)
     plt.plot()
 
-    p1 = plt.heatmap(gn.x / 1e3, gn.y / 1e3, transpose(wave_simulation.model.State[:, :, 1]))
+    p1 = plt.heatmap(transpose(wave_simulation.model.State[:, :, 1]))
 
     for xy in FailedTable.position_xy
         x = xy[1] / 1e3
@@ -229,7 +234,7 @@ index, weight  = PIC.compute_weights_and_index(grid, PF.Particle.ODEIntegrator.u
 
 
 # try manual solution with the same initial conditions
-using DifferentialEquations
+#using OrdinaryDiffEq
 
 #PF.Particle.ODEIntegrator.u = ui
 ui2 = copy(PF.Particle.ODEIntegrator.sol.prob.u0)

@@ -2,8 +2,8 @@ module particle_waves_v4
 
 #@info "Loading ModelingToolkit"
 # using ModelingToolkit
-#@info "Loading DifferentialEquations"
-using DifferentialEquations, IfElse
+#using OrdinaryDiffEq
+using IfElse
 
 using ...Architectures: AbstractODESettings
 

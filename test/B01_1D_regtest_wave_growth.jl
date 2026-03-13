@@ -10,7 +10,7 @@ using PiCLES.Operators.core_2D: ParticleDefaults as ParticleDefaults_2D, InitPar
 
 using PiCLES.ParticleMesh: OneDGrid, OneDGridNotes
 
-using DifferentialEquations
+#using OrdinaryDiffEq
 
 using PiCLES.Utils.ParticleTools
 using Plots

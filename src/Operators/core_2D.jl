@@ -1,6 +1,11 @@
 module core_2D
 
-using DifferentialEquations: OrdinaryDiffEq.ODEIntegrator, OrdinaryDiffEq.ODEProblem, init
+#using OrdinaryDiffEq: OrdinaryDiffEqCore.ODEIntegrator, ODEProblem, init
+# include("../Solvers/RK35Integrator.jl")
+# using .RK35Integrator: ODEIntegrator, step!, solve!
+
+using ...Solvers.RK35Integrator: ODEIntegrator, step!, solve!
+
 
 using SharedArrays
 using StaticArrays
@@ -15,7 +20,7 @@ export InitParticleValues
 using ...FetchRelations
 
 using ...Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance, StateTypeL1
-using ...Architectures: AbstractGridStatistics
+using ...Architectures: AbstractGridStatistics, AbstractODEIntegrator
 
 
 # using ..particle_waves_v3: init_vars
@@ -173,23 +178,32 @@ function InitParticleInstance(model, z_initials, ODE_settings, ij, xy , boundary
         ODE_parameters = (; ODE_parameters..., x = xy[1], y = xy[2])
 
         z_initials = initParticleDefaults(z_initials)
-        # create ODEProblem
-        problem = ODEProblem(model, z_initials, (0.0, ODE_settings.total_time), ODE_parameters)
-        # inialize problem
-        # works best with abstol = 1e-4,reltol=1e-3,maxiters=1e4,
-        integrator = init(
-                problem,
-                ODE_settings.solver,
-                saveat=ODE_settings.saving_step,
-                abstol=ODE_settings.abstol,
-                adaptive=ODE_settings.adaptive,
-                dt = ODE_settings.dt,
-                dtmin=ODE_settings.dtmin,
-                force_dtmin=ODE_settings.force_dtmin,
-                maxiters=ODE_settings.maxiters,
+
+        integrator = ODEIntegrator(model, z_initials, 0.0, ODE_parameters;
+                dt=ODE_settings.dt,
                 reltol=ODE_settings.reltol,
-                callback=ODE_settings.callbacks,
-                save_everystep=ODE_settings.save_everystep)
+                abstol=ODE_settings.reltol,
+                dtmin=ODE_settings.dtmin,
+                dtmax=ODE_settings.dtmax)
+
+
+        # create ODEProblem --- ODEDiffEq version
+        # problem = ODEProblem(model, z_initials, (0.0, ODE_settings.total_time), ODE_parameters)
+        # # inialize problem
+        # # works best with abstol = 1e-4,reltol=1e-3,maxiters=1e4,
+        # integrator = init(
+        #         problem,
+        #         ODE_settings.solver,
+        #         saveat=ODE_settings.saving_step,
+        #         abstol=ODE_settings.abstol,
+        #         adaptive=ODE_settings.adaptive,
+        #         dt = ODE_settings.dt,
+        #         dtmin=ODE_settings.dtmin,
+        #         force_dtmin=ODE_settings.force_dtmin,
+        #         maxiters=ODE_settings.maxiters,
+        #         reltol=ODE_settings.reltol,
+        #         callback=ODE_settings.callbacks,
+        #         save_everystep=ODE_settings.save_everystep)
 
         return ParticleInstance2D(ij, (xy[1], xy[2]), integrator, boundary_flag, particle_on)
 end

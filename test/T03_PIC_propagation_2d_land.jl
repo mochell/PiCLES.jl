@@ -29,6 +29,8 @@ using PiCLES.Architectures: AbstractGridStatistics, CartesianGridStatistics
 
 using PiCLES.Operators.core_2D: ParticleDefaults as ParticleDefaults2D
 
+using PiCLES.Solvers: step!
+
 #using GLMakie
 
 using Plots
@@ -45,9 +47,8 @@ using BenchmarkTools
 using PiCLES.Grids
 
 using PiCLES.Operators.TimeSteppers: time_step!
-using DifferentialEquations
+#using OrdinaryDiffEq
 using PiCLES.Operators: mapping_2D
-
 
 
 # %%
@@ -77,8 +78,9 @@ heatmap(grid.data.x[:, 1], grid.data.y[1, :], transpose(grid.data.mask))
 mask = ones(Bool, size(grid.data.x)) # 1 is ocean, 0 is land (?)
 mask[10:20, 5:10] .= 0
 #mask  = .!mask # to make one active block
+
 gridstats_mask = TwoDCartesianGridMesh(grid.stats; mask=mask)
-grid = TwoDCartesianGridMesh(gridstats_mask, grid.stats, ProjetionKernel)
+grid = TwoDCartesianGridMesh(gridstats_mask, grid.stats, ProjetionKernel, grid.PropagationCorrection)
 
 
 heatmap(grid.data.x[:,1], grid.data.y[1,:], transpose(grid.data.mask))
@@ -103,21 +105,17 @@ cg_u_local = WindSeamin["cg_bar_x"]
 cg_v_local = WindSeamin["cg_bar_y"]
 
 ODE_settings = PW.ODESettings(
-    Parameters=default_ODE_parameters,
+    Parameters=ODEpars,
     # define mininum energy threshold
     log_energy_minimum=lne_local,#log(FetchRelations.Eⱼ(0.1, DT)),
     #maximum energy threshold
     log_energy_maximum=log(27),#log(17),  # correcsponds to Hs about 16 m
-    saving_step=DT,
+    saving_step=6000,
     timestep=DT,
-    total_time=T = 6days,
-    adaptive=true,
-    dt=1e-3, #60*10, 
-    dtmin=1e-4, #60*5, 
-    force_dtmin=true,
-    callbacks=nothing,
-    save_everystep=false)
-
+    total_time=T = 12days,
+    dt=1e-3,
+    dtmin=1e-4,
+    dtmax=20minutes)
 
 # %%
 

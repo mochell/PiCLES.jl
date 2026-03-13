@@ -4,7 +4,7 @@ using SharedArrays
 using StaticArrays
 
 
-export AbstractGrid, AbstractODESettings, AbstractParticleInstance, AbstractMarkedParticleInstance, Abstract1DModel, Abstract2DModel, AbstractModel, AbstractStore, AbstractParticleSystem, StateTypeL1, IDConstantsInstance, ScgConstantsInstance, CartesianGrid, CartesianGrid1D, CartesianGrid2D, TripolarGrid, Grid2D, MeshGrids, MeshGridStatistics
+export AbstractGrid, AbstractODESettings, AbstractParticleInstance, AbstractMarkedParticleInstance, Abstract1DModel, Abstract2DModel, AbstractModel, AbstractStore, AbstractParticleSystem, StateTypeL1, IDConstantsInstance, ScgConstantsInstance, CartesianGrid, CartesianGrid1D, CartesianGrid2D, TripolarGrid, Grid2D, MeshGrids, MeshGridStatistics, AbstractODEIntegrator
 
 export StandardRegular1D_old, StandardRegular2D_old
 
@@ -37,12 +37,16 @@ Grid2D = Union{CartesianGrid2D,SphericalGrid2D,StandardRegular2D_old}
 MeshGrids = Union{CartesianGrid2D,TripolarGrid,SphericalGrid2D}
 MeshGridStatistics = Union{CartesianGridStatistics,TripolarGridStatistics,SphericalGridStatistics}
 
+
+abstract type AbstractODEIntegrator end
+
 abstract type AbstractODESettings end
 abstract type AbstractParticleInstance end
 abstract type AbstractMarkedParticleInstance end
 
 abstract type IDConstantsInstance end
 abstract type ScgConstantsInstance end
+
 
 
 """

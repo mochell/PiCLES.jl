@@ -2,7 +2,9 @@ module mapping_2D
 
 using SharedArrays
 using StaticArrays
-using DifferentialEquations
+#using OrdinaryDiffEq
+using ...Solvers.RK35Integrator: step! #ODEIntegrator, 
+
 using Printf
 
 using ...ParticleMesh: TwoDGrid, TwoDGridNotes
@@ -82,33 +84,85 @@ function ParticleToNode!(PI::AbstractParticleInstance, S::SharedMatrix, u_state:
         nothing
 end
 
-function set_u_and_t!(integrator, u_new::CC, t_new::Number) where CC <:Union{Vector{Float64},MVector}
-        integrator.u = u_new
-        integrator.t = t_new
-end
+# function set_u_and_t!(integrator, u_new::CC, t_new::Number) where CC <:Union{Vector{Float64},MVector}
+#         integrator.u = u_new
+#         integrator.t = t_new
+# end
 
 
-function reset_PI_u!(PI::AbstractParticleInstance; ui::CC) where CC<:Union{Vector{Float64},MVector{Float64}}  
+function reset_PI_u!(PI::AbstractParticleInstance; ui::CC) where {N,CC<:Union{Vector{Float64},MVector{N,Float64}}}
         # this method keeps the correct time for time varying forcing (~may 2023)
-        set_u!(PI.ODEIntegrator, ui)
-        u_modified!(PI.ODEIntegrator, true)
-        auto_dt_reset!(PI.ODEIntegrator)
+        # set_u!(PI.ODEIntegrator, ui)
+        # u_modified!(PI.ODEIntegrator, true)
+        # auto_dt_reset!(PI.ODEIntegrator)
+        PI.ODEIntegrator.u = ui
+        PI.ODEIntegrator.has_fsal = false
 end
 
 
-function reset_PI_ut!(PI::AbstractParticleInstance; ui::CC, ti::Number) where CC <:Union{Vector{Float64},MVector}
-        # this method keeps the correct time for time varying forcing (~may 2023)
-        set_u_and_t!(PI.ODEIntegrator, ui, ti)
-        u_modified!(PI.ODEIntegrator, true)
-        auto_dt_reset!(PI.ODEIntegrator)
+"""
+    reset_PI_ut!(integrator, u_init, t_init; dt_init=nothing)
+
+Reset an existing ODE integrator state in-place.
+
+This helper updates:
+- `PI.ODEIntegrator.u` to `u_init`
+- `PI.ODEIntegrator.t` to `t_init`
+- optionally `PI.ODEIntegrator.dt` to `dt_init` (if provided)
+
+It is a lightweight state reset and does **not** rebuild the integrator,
+recreate solver caches, or clear stored solution history.
+"""
+function reset_PI_ut!(PI::AbstractParticleInstance, u_init::CC, t_init; dt_init=nothing) where {N,CC<:Union{Vector{Float64},MVector{N,Float64}}}
+    PI.ODEIntegrator.u = u_init
+    PI.ODEIntegrator.t = t_init
+    if dt_init !== nothing
+        PI.ODEIntegrator.dt = dt_init
+    end
+        PI.ODEIntegrator.has_fsal = false
 end
 
+# old version
+# function reset_PI_ut!(PI::AbstractParticleInstance; ui::CC, ti::Number) where CC <:Union{Vector{Float64},MVector}
+#         # this method keeps the correct time for time varying forcing (~may 2023)
+#         set_u_and_t!(PI.ODEIntegrator, ui, ti)
+#         u_modified!(PI.ODEIntegrator, true)
+#         auto_dt_reset!(PI.ODEIntegrator)
+# end
+
+"""
+    reset_PI_t!(PI::AbstractParticleInstance; ti::Number)
+Reset the time of an existing ODE integrator in-place.
+
+This helper updates:
+- `PI.ODEIntegrator.t` to `ti`
+
+It is a lightweight state reset and does **not** rebuild the integrator,
+recreate solver caches, or clear stored solution history.
+
+"""
 function reset_PI_t!(PI::AbstractParticleInstance; ti::Number)
         # this method keeps the correct time for time varying forcing (~may 2023)
-        set_t!(PI.ODEIntegrator, ti)
-        u_modified!(PI.ODEIntegrator, true)
-        auto_dt_reset!(PI.ODEIntegrator)
+        PI.ODEIntegrator.t = ti
+        # set_t!(PI.ODEIntegrator, ti)
+        # u_modified!(PI.ODEIntegrator, true)
+        # auto_dt_reset!(PI.ODEIntegrator)
 end
+
+"""
+    reinit_PI!(integrator, u_init, t_init, ODE_settings)
+Reinitialize an ODE integrator with new initial conditions and settings.
+This helper creates a new ODEIntegrator instance with the provided initial state `u_init`, time `t_init`, and ODE parameters from `ODE_settings`. It effectively resets the integrator's state and solver configuration, including any internal caches, to reflect the new initial conditions.
+"""
+function reinit_PI!(PI::AbstractParticleInstance, u::CC, t, ODE_settings) where {N,CC<:Union{Vector{Float64},MVector{N,Float64}}}
+    return ODEIntegrator(PI.ODEIntegrator.model!, u, t, ODE_settings.Parameters;
+                dt      =ODE_settings.dt,
+                reltol  =ODE_settings.reltol,
+                abstol  =ODE_settings.abstol,
+                dtmin   =ODE_settings.dtmin,
+                dtmax   =ODE_settings.dtmax)
+end
+
 
 ######### Core routines for advancing and remeshing
 
@@ -130,8 +184,8 @@ function advance!(PI::AbstractParticleInstance,
 
         #if ~PI.boundary # if point is not a 
         t_start  =  copy(PI.ODEIntegrator.t)
-        add_saveat!(PI.ODEIntegrator, PI.ODEIntegrator.t )
-        savevalues!(PI.ODEIntegrator)
+        # add_saveat!(PI.ODEIntegrator, PI.ODEIntegrator.t )
+        # savevalues!(PI.ODEIntegrator)
         
         # set the position in particle state vector either to the node position or to the relative position in the CartesianGrid
         if typeof(Grid) <: MeshGrids
@@ -163,7 +217,7 @@ function advance!(PI::AbstractParticleInstance,
                                         copy(PI),
                                         copy(PI.ODEIntegrator.t),
                                         copy(PI.ODEIntegrator.u),
-                                        PI.ODEIntegrator.sol.retcode
+                                        0
                                 ))
                         return
 
@@ -264,6 +318,7 @@ function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
                         ODEs.wind_min_squared,
                         default_particle, 
                         ODEs.log_energy_minimum, 
+                        ODEs.dt,
                         DT)
         #return PI
 end
@@ -282,7 +337,8 @@ function NodeToParticle!(PI::AbstractParticleInstance, S::StateTypeL1,
         minimal_state::Vector{Float64},
         wind_min_squared::Float64, 
         default_particle::PP, 
-        e_min_log::Number, 
+        e_min_log::Number,
+        dt_init::Float64, 
         DT::Float64,) where {PP<:Union{ParticleDefaults,Nothing}}
 
         # load data from shared array
@@ -301,27 +357,15 @@ function NodeToParticle!(PI::AbstractParticleInstance, S::StateTypeL1,
         end
 
         last_t = PI.ODEIntegrator.t
-        # minimal_state[1] is the minmal Energy  
-        # minimal_state[2] is the minmal momentum squared  
+        # minimal_state[1] is the minimal Energy  
+        # minimal_state[2] is the minimal momentum squared  
         if ~PI.boundary & (u_state[1] >= minimal_state[1]) & (speed_square(u_state[2], u_state[3]) >= minimal_state[2]) # all integrior nodes: convert note to particle values and push to ODEIntegrator
 
                 #@show "u_state", u_state
                 ui = GetVariablesAtVertex(u_state, xy[1], xy[2])
                 #@info exp(ui[1]), ui[2], ui[4]/1e3, ui[5]/1e3              
-                reset_PI_ut!(PI; ui=ui, ti=last_t)
+                reset_PI_ut!(PI, ui, last_t; dt_init=dt_init)
                 PI.on = true
-
-                # this method is more robust than the set_u! method (~february 2023)
-                # reinit!(PI.ODEIntegrator, ui, erase_sol=false, reset_dt=true, reinit_cache=true)#, reinit_callbacks=true)
-                # set_t!(PI.ODEIntegrator, last_t )
-                # u_modified!(PI.ODEIntegrator,true)
-                # auto_dt_reset!(PI.ODEIntegrator)
-
-                # # this method is more robust than the set_u! method
-                # reinit!(PI.ODEIntegrator, ui, erase_sol=false, reset_dt=true, reinit_cache=true)#, reinit_callbacks=true)
-                # #set_u!(PI.ODEIntegrator, ui )
-                # #set_t!(PI.ODEIntegrator, last_t )
-                # u_modified!(PI.ODEIntegrator,true)
 
                 #@show PI.ODEIntegrator.t, PI.ODEIntegrator.u
                 
@@ -330,26 +374,39 @@ function NodeToParticle!(PI::AbstractParticleInstance, S::StateTypeL1,
                 #      if particle is at the boundary
 
                 ui = ResetParticleValues(default_particle, xy, wind_tuple, DT) # returns winds sea given DT and winds
-                reinit!(PI.ODEIntegrator, ui, erase_sol=false, reset_dt=true, reinit_cache=true)#, reinit_callbacks=true)
-                reset_PI_t!(PI, ti=last_t)
+
+                # OrdinaryDiffEq reinit method, creates new integrator instance, resets cache, and erases solution history 
+                # reinit!(PI.ODEIntegrator, ui, erase_sol=false, reset_dt=true, reinit_cache=true)#, reinit_callbacks=true)
+                # reset_PI_t!(PI, ti=last_t)
+
+                # new stuff
+                reset_PI_ut!(PI, ui, last_t; dt_init=dt_init)
 
                 PI.on = true
 
         elseif PI.boundary & (speed_square(wind_tuple[1], wind_tuple[2]) >= wind_min_squared) # at the boundary, reset particle if winds are strong enough
 
                 ui = ResetParticleValues(default_particle, xy, wind_tuple, DT) # returns winds sea given DT and winds
-                reinit!(PI.ODEIntegrator, ui, erase_sol=false, reset_dt=true, reinit_cache=true)#, reinit_callbacks=true)
-                reset_PI_t!(PI, ti=last_t)
+
+                # OrdinaryDiffEq reinit method, creates new integrator instance, resets cache, and erases solution history 
+                # reinit!(PI.ODEIntegrator, ui, erase_sol=false, reset_dt=true, reinit_cache=true)#, reinit_callbacks=true)
+                # reset_PI_t!(PI, ti=last_t)
+
+                reset_PI_ut!(PI, ui, last_t; dt_init=dt_init)
                 # @info default_particle, ui
                 PI.on = true
+        elseif (u_state[1] >= minimal_state[1])
+                ui = GetVariablesAtVertex(u_state, xy[1], xy[2])
+                #@info exp(ui[1]), ui[2], ui[4]/1e3, ui[5]/1e3              
+                reset_PI_ut!(PI, ui, last_t; dt_init=dt_init)
+                PI.on = true
 
- 
         else # particle is below energy threshold & on boundary
-                #PI.ODEIntegrator.u = ResetParticleValues(minimal_particle, xy, wind_tuple, DT)
+                # PI.ODEIntegrator.u = ResetParticleValues(minimal_particle, xy, wind_tuple, DT)
                 # if ~PI.boundary
                 #         @info u_state
                 # end
-                PI.on = false
+                PI.on = true
         end
         nothing
 

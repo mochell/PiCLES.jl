@@ -2,18 +2,18 @@ module custom_structures
 
 export ParticleInstance1D, ParticleInstance2D, MarkedParticleInstance, AbstractParticleInstance, AbstractMarkedParticleInstance, wni
 
-using DifferentialEquations: OrdinaryDiffEq.ODEIntegrator
+#using OrdinaryDiffEq: OrdinaryDiffEqCore.ODEIntegrator
 using DocStringExtensions
 using StaticArrays
 
-using ..Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance
+using ..Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance, AbstractODEIntegrator
 using ..Architectures: AbstractBoundary
 
 # ParticleInstance is the Stucture that carries each particle.
 mutable struct ParticleInstance2D <: AbstractParticleInstance
         position_ij::Tuple{Int, Int}
         position_xy::Tuple{Float64, Float64}
-        ODEIntegrator::Union{ODEIntegrator,Nothing}
+        ODEIntegrator::Union{AbstractODEIntegrator,Nothing}
         boundary :: Bool
         on::Bool
 end
@@ -21,7 +21,7 @@ end
 mutable struct ParticleInstance1D <: AbstractParticleInstance
         position_ij::Int
         position_xy::Float64
-        ODEIntegrator::ODEIntegrator
+        ODEIntegrator::AbstractODEIntegrator
         boundary::Bool
         on::Bool
 end

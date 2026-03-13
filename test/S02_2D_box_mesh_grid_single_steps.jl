@@ -254,7 +254,7 @@ index, weight = PIC.compute_weights_and_index(grid, PF.Particle.ODEIntegrator.u[
 
 
 # try manual solution with the same initial conditions
-using DifferentialEquations
+#using OrdinaryDiffEq
 
 #PF.Particle.ODEIntegrator.u = ui
 ui2 = copy(PF.Particle.ODEIntegrator.sol.prob.u0)

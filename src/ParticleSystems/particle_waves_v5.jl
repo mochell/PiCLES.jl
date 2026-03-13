@@ -1,6 +1,7 @@
 module particle_waves_v5
 
-using DifferentialEquations, IfElse
+#using OrdinaryDiffEq
+using IfElse
 
 using ...Architectures: AbstractODESettings, AbstractParticleSystem, IDConstantsInstance, ScgConstantsInstance
 
@@ -44,7 +45,7 @@ $(DocStringExtensions.FIELDS)
     "solver method for ODE system"
     #alternatives
     #Rosenbrock23(), AutoVern7(Rodas4()) ,AutoTsit5(Rosenbrock23()) , Tsit5()
-    solver::Any = AutoTsit5(Rosenbrock23())
+    solver::Any = nothing
     "Internal saving timestep of the ODEs"
     saving_step::Float64
     "remeshing time step, i.e. timestep of the model"
@@ -54,25 +55,63 @@ $(DocStringExtensions.FIELDS)
     abstol::Float64 = 1e-4
     "relative allowed error"
     reltol::Float64 = 1e-3
-    "max iteration for ODE solver (1e4)"
-    maxiters::Int = 1e4
-    "Adaptive timestepping for ODE (true)"
-    adaptive::Bool = true
     "timestep (if adaptive is false this is used), if adaptive is true this is the initial timestep"
-    dt::Float64 = 60 * 6 # seconds
-    "min timestep (if adaptive is true)"
-    dtmin::Float64 = 60 * 5 # seconds
-    "force min timestep (if adaptive is true)"
-    force_dtmin::Bool = false
+    dt::Float64 = 60 # seconds
+    "min timestep"
+    dtmin::Float64 = 1e-2 # seconds
+    "max timestep"
+    dtmax::Float64 = 60 * 10 # seconds
 
     "Total time of the ODE integration, should not be needed, this is problematic .. "
     total_time::Float64
-
-    "Callback function for ODE solver"
-    callbacks::Any = nothing
-    "save_everystep (false)"
-    save_everystep::Bool = false
+    # "Callback function for ODE solver"
+    # callbacks::Any = nothing
 end
+
+
+# @with_kw mutable struct ODESettings <: AbstractODESettings
+#     "ODE parameters (Dict)"
+#     Parameters::NamedTuple
+#     "minimum allowed log energy on particle "
+#     log_energy_minimum::Float64
+#     "maximum allowed log energy on particle "
+#     log_energy_maximum::Float64 = log(17)
+
+#     "minimum needed squared wind velocity to seed particle"
+#     wind_min_squared::Float64 = 4.0
+#     "solver method for ODE system"
+#     #alternatives
+#     #Rosenbrock23(), AutoVern7(Rodas4()) ,AutoTsit5(Rosenbrock23()) , Tsit5()
+#     solver::Any = AutoTsit5(Rosenbrock23())
+#     "Internal saving timestep of the ODEs"
+#     saving_step::Float64
+#     "remeshing time step, i.e. timestep of the model"
+#     timestep::Float64
+
+#     "Absolute allowed error"
+#     abstol::Float64 = 1e-4
+#     "relative allowed error"
+#     reltol::Float64 = 1e-3
+#     "max iteration for ODE solver (1e4)"
+#     maxiters::Int = 1e4
+#     "Adaptive timestepping for ODE (true)"
+#     adaptive::Bool = true
+#     "timestep (if adaptive is false this is used), if adaptive is true this is the initial timestep"
+#     dt::Float64 = 60 * 6 # seconds
+#     "min timestep (if adaptive is true)"
+#     dtmin::Float64 = 60 * 5 # seconds
+#     "force min timestep (if adaptive is true)"
+#     force_dtmin::Bool = false
+
+#     "Total time of the ODE integration, should not be needed, this is problematic .. "
+#     total_time::Float64
+
+#     "Callback function for ODE solver"
+#     callbacks::Any = nothing
+#     "save_everystep (false)"
+#     save_everystep::Bool = false
+# end
+
 
 
 

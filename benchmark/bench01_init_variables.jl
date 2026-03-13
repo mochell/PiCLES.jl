@@ -1,4 +1,11 @@
-using DifferentialEquations
+ENV["JULIA_INCREMENTAL_COMPILE"] = false
+using Pkg
+Pkg.activate("PiCLES/")
+
+# #using OrdinaryDiffEq
+# #using OrdinaryDiffEq: OrdinaryDiffEqCore.ODEIntegrator
+
+
 using Plots
 using Setfield
 

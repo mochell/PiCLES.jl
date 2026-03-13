@@ -1,10 +1,12 @@
 ENV["JULIA_INCREMENTAL_COMPILE"]=true
-
+using Pkg
+Pkg.activate("PiCLES/")
 import Plots as plt
 using Setfield, IfElse
 
 using PiCLES.ParticleSystems: particle_waves_v5 as PW
 
+using PiCLES
 
 import PiCLES: FetchRelations, ParticleTools
 using PiCLES.Operators.core_2D: ParticleDefaults, InitParticleInstance, GetGroupVelocity
@@ -75,9 +77,8 @@ v(x, y, t) = v_func(x, y, t)
 winds = (u=u, v=v)
 
 
-grid = TwoDGrid(100e3, 81, 100e3, 81)
-mesh = TwoDGridMesh(grid, skip=1);
-gn = TwoDGridNotes(grid);
+grid = PiCLES.Grids.CartesianGrid.TwoDCartesianGridMesh(100e3, 81, 100e3, 81)
+
 
 Revise.retry()
 # define variables based on particle equation
@@ -95,7 +96,9 @@ WindSeamin = FetchRelations.MinimalWindsea(U10, V10, DT )
 lne_local = log(WindSeamin["E"])
 default_particle = ParticleDefaults(lne_local, WindSeamin["cg_bar_x"], WindSeamin["cg_bar_y"], 0.0, 0.0)
 
-ODE_settings    = PW.ODESettings(
+
+
+ODE_settings = PW.ODESettings(
     Parameters=ODEpars,
     # define mininum energy threshold
     log_energy_minimum=lne_local,#log(FetchRelations.Eⱼ(0.1, DT)),
@@ -103,14 +106,10 @@ ODE_settings    = PW.ODESettings(
     log_energy_maximum=log(27),#log(17),  # correcsponds to Hs about 16 m
     saving_step=dt_ODE_save,
     timestep=DT,
-    total_time=T=12days,
-    adaptive=true,
+    total_time=T = 12days,
     dt=1e-3, #60*10, 
     dtmin=1e-4, #60*5, 
-    force_dtmin=true,
-    callbacks=nothing,
-    save_everystep=false)
-
+    dtmax=20minutes)
 
 
 # %%

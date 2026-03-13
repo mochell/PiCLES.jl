@@ -3,7 +3,8 @@ using JLD2
 using DataFrames
 
 import Base: filter!
-using DifferentialEquations, Statistics
+#using OrdinaryDiffEq
+using Statistics
 
 
 mutable struct ParticleInstance
