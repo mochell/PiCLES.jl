@@ -293,7 +293,7 @@ function advance!(PI::AbstractParticleInstance,
                 ParticleToNode!(PI, S, Grid, periodic_boundary)
         end
 
-        #return PI
+        return PI
 end
 
 """
@@ -311,7 +311,7 @@ function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
                 
         winds_i::Tuple{Float64,Float64} = winds.u(PI.position_xy[1], PI.position_xy[2], ti), winds.v(PI.position_xy[1], PI.position_xy[2], ti)
         
-        NodeToParticle!(PI, S, 
+        PI = NodeToParticle!(PI, S, 
                         winds_i, 
                         grid_stats,
                         minimal_state,
@@ -320,7 +320,7 @@ function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
                         ODEs.log_energy_minimum, 
                         ODEs.dt,
                         DT)
-        #return PI
+        return PI
 end
 
 
@@ -356,6 +356,7 @@ function NodeToParticle!(PI::AbstractParticleInstance, S::StateTypeL1,
                 # end
         end
 
+        # on_before = PI.on
         last_t = PI.ODEIntegrator.t
         # minimal_state[1] is the minimal Energy  
         # minimal_state[2] is the minimal momentum squared  
@@ -406,9 +407,14 @@ function NodeToParticle!(PI::AbstractParticleInstance, S::StateTypeL1,
                 # if ~PI.boundary
                 #         @info u_state
                 # end
-                PI.on = true
+                PI.on = false
+
         end
-        nothing
+        
+        # if PI.position_ij[2] == 6
+        #         @info "end of NodeToParticle!: $(PI.position_ij) particle on change :$(on_before) to $(PI.on)"
+        # end
+        return PI
 
 end
 

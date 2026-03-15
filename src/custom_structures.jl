@@ -65,5 +65,23 @@ end
 # end
 
 
+function Base.show(io::IO, ow::ParticleInstance2D)
+        sys_print = "ParticleEquations2D: u(x,y,t), v(x,y,t)"
+        ODEint = ow.ODEIntegrator
+        print(io, "ParticleInstance2D ", "\n",
+                "├── position_ij: ", ow.position_ij, "\n",
+                "├── position_xy: ", ow.position_xy, "\n",
+                "├── boundary:    ", ow.boundary, "\n",
+                "├── on:          ", ow.on, "\n",
+                "├── ODEIntegrator    \n",
+                "|        ├── model: ", ODEint.model!, "\n",
+                "|        ├── u:     ", ODEint.u, "\n",
+                "|        ├── t:     ", ODEint.t, "\n",
+                "|        └── params: ", ODEint.params, "\n",
+                "└── ODEIntegrator-solver    \n",
+                "         ├── dt:       ", ODEint.dt, "\n",
+                "         ├── has_fsal: ", ODEint.has_fsal, "\n",
+                "         └── err:      ", ODEint.err, "\n")
+end
 
 end

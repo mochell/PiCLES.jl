@@ -1,6 +1,7 @@
 using HDF5
 using DataStructures
 
+using ..Architectures: CartesianGrid2D, SphericalGrid2D
 using ..ParticleMesh
 #using Simulation
 
@@ -71,6 +72,12 @@ end
 function make_coords(grid::OneDGrid)
     x = collect(LinRange(0, grid.dimx, grid.Nx))
     (x=x,)
+end
+
+function make_coords(grid::CartesianGrid2D)
+    x = collect(LinRange(0, grid.stats.dimx, grid.stats.Nx.N))
+    y = collect(LinRange(0, grid.stats.dimy, grid.stats.Ny.N))
+    (x=x, y=y)
 end
 
 
