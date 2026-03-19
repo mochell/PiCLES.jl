@@ -5,7 +5,8 @@ using CairoMakie
 using ...ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
 using ...Operators.core_2D: GetGroupVelocity
 
-using ...Architectures: Grid2D, CartesianGrid, CartesianGridStatistics, CartesianGrid2D, CartesianGrid1D, AbstractGridStatistics, AbstractGrid, StandardRegular2D_old
+using ...Architectures: Grid2D, CartesianGrid, CartesianGridStatistics, CartesianGrid2D, CartesianGrid1D, AbstractGridStatistics, AbstractGrid, StandardRegular2D_old,
+SphericalGrid, SphericalGridStatistics, SphericalGrid2D
 
 import Oceananigans.Utils: prettytime
 
@@ -262,6 +263,10 @@ function init_movie_2D_rectangle(wave_simulation; resolution=(900, 1200), name_s
         mesh = grid.data
         gn = (x=grid.data.x[:, 1], y=grid.data.y[1, :])
         dx = grid.stats.dx
+    elseif typeof(grid) <: SphericalGrid
+        mesh = grid.data
+        gn = (x=grid.data.x[:, 1], y=grid.data.y[1, :])
+        dx = grid.stats.dx_deg
     end
 
     arrow_skip = 10
