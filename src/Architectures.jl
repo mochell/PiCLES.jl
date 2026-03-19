@@ -73,4 +73,21 @@ Base.show(io::IO, obj::AbstractBoundary) = print(io, "Int=", obj.N, " ", typeof(
 BoundaryType = Union{AbstractBoundary,Integer}
 
 
+
+"""
+    AbstractDiagnostic
+
+Abstract supertype for diagnostics that compute information from the current
+model state.
+"""
+abstract type AbstractDiagnostic end
+
+"""
+    AbstractOutputWriter
+
+Abstract supertype for output writers that write data to disk.
+"""
+abstract type AbstractOutputWriter end
+
+
 end

@@ -191,7 +191,7 @@ wave_simulation.model.State[:,:,1]
 Revise.retry()
 plot_particle_collection(wave_model)
 
-for i in 1:1:280
+for i in 1:1:100
     TimeSteppers.time_step!(wave_simulation.model, wave_simulation.Δt)
 
     if i%8 == 0 
