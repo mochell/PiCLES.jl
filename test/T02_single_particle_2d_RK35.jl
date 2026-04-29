@@ -78,7 +78,6 @@ ODE_settings = PW.ODESettings_new(
 
 
 using PiCLES.Solvers.RK35Integrator: ODEIntegrator, step!, solve!
-
 using PiCLES.Operators.core_2D: initParticleDefaults
 
 z_initials = initParticleDefaults(ParticleState)
