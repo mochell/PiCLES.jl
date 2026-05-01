@@ -244,7 +244,7 @@ wave_simulation = Simulation(wave_model, Δt=DT, stop_time=T_int)
 initialize_simulation!(wave_simulation)
 plot_particle_collection(wave_model)
 
-# run!(wave_simulation, cash_store=true, debug=false);
+run!(wave_simulation, cash_store=true, debug=false);
 
 plot_particle_collection(wave_model)
 
