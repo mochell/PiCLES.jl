@@ -1,11 +1,11 @@
 
 using DataStructures
-using Oceananigans: AbstractDiagnostic, AbstractOutputWriter, fields
+
 
 import Oceananigans: fields
 using Oceananigans.Units
 
-using ..Architectures: AbstractStore
+using ..Architectures: AbstractStore, AbstractDiagnostic, AbstractOutputWriter
 
 #using PiCLES.Architectures: StateOrNothing, StateStore, AbstractStore, EmptyStore
 

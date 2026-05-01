@@ -41,7 +41,7 @@ using BenchmarkTools
 using PiCLES.Grids
 
 using PiCLES.Operators.TimeSteppers: time_step!
-using DifferentialEquations
+#using OrdinaryDiffEq
 using PiCLES.Operators: mapping_2D
 
 

@@ -10,7 +10,7 @@ import PiCLES: FetchRelations
 using PiCLES.Operators.core_1D: ParticleDefaults, InitParticleValues, InitParticleInstance
 using PiCLES.ParticleMesh: OneDGrid, OneDGridNotes
 
-using ModelingToolkit, DifferentialEquations
+#using OrdinaryDiffEq
 
 using PiCLES.Utils.ParticleTools 
 using Plots

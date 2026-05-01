@@ -4,7 +4,7 @@ using SharedArrays
 using StaticArrays
 
 
-export AbstractGrid, AbstractODESettings, AbstractParticleInstance, AbstractMarkedParticleInstance, Abstract1DModel, Abstract2DModel, AbstractModel, AbstractStore, AbstractParticleSystem, StateTypeL1, IDConstantsInstance, ScgConstantsInstance, CartesianGrid, CartesianGrid1D, CartesianGrid2D, TripolarGrid, Grid2D, MeshGrids, MeshGridStatistics
+export AbstractGrid, AbstractODESettings, AbstractParticleInstance, AbstractMarkedParticleInstance, Abstract1DModel, Abstract2DModel, AbstractModel, AbstractStore, AbstractParticleSystem, StateTypeL1, IDConstantsInstance, ScgConstantsInstance, CartesianGrid, CartesianGrid1D, CartesianGrid2D, TripolarGrid, Grid2D, MeshGrids, MeshGridStatistics, AbstractODEIntegrator
 
 export StandardRegular1D_old, StandardRegular2D_old
 
@@ -37,12 +37,16 @@ Grid2D = Union{CartesianGrid2D,SphericalGrid2D,StandardRegular2D_old}
 MeshGrids = Union{CartesianGrid2D,TripolarGrid,SphericalGrid2D}
 MeshGridStatistics = Union{CartesianGridStatistics,TripolarGridStatistics,SphericalGridStatistics}
 
+
+abstract type AbstractODEIntegrator end
+
 abstract type AbstractODESettings end
 abstract type AbstractParticleInstance end
 abstract type AbstractMarkedParticleInstance end
 
 abstract type IDConstantsInstance end
 abstract type ScgConstantsInstance end
+
 
 
 """
@@ -67,6 +71,23 @@ abstract type AbstractBoundary <: Integer end
 Base.show(io::IO, obj::AbstractBoundary) = print(io, "Int=", obj.N, " ", typeof(obj))
 
 BoundaryType = Union{AbstractBoundary,Integer}
+
+
+
+"""
+    AbstractDiagnostic
+
+Abstract supertype for diagnostics that compute information from the current
+model state.
+"""
+abstract type AbstractDiagnostic end
+
+"""
+    AbstractOutputWriter
+
+Abstract supertype for output writers that write data to disk.
+"""
+abstract type AbstractOutputWriter end
 
 
 end

@@ -36,7 +36,7 @@ using ProfileView
 
 using DataFrames
 
-using DifferentialEquations
+#using OrdinaryDiffEq
 
 @info "precompiled!"
 # %%

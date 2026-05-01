@@ -2,18 +2,18 @@ module custom_structures
 
 export ParticleInstance1D, ParticleInstance2D, MarkedParticleInstance, AbstractParticleInstance, AbstractMarkedParticleInstance, wni
 
-using DifferentialEquations: OrdinaryDiffEq.ODEIntegrator
+#using OrdinaryDiffEq: OrdinaryDiffEqCore.ODEIntegrator
 using DocStringExtensions
 using StaticArrays
 
-using ..Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance
+using ..Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance, AbstractODEIntegrator
 using ..Architectures: AbstractBoundary
 
 # ParticleInstance is the Stucture that carries each particle.
 mutable struct ParticleInstance2D <: AbstractParticleInstance
         position_ij::Tuple{Int, Int}
         position_xy::Tuple{Float64, Float64}
-        ODEIntegrator::Union{ODEIntegrator,Nothing}
+        ODEIntegrator::Union{AbstractODEIntegrator,Nothing}
         boundary :: Bool
         on::Bool
 end
@@ -21,7 +21,7 @@ end
 mutable struct ParticleInstance1D <: AbstractParticleInstance
         position_ij::Int
         position_xy::Float64
-        ODEIntegrator::ODEIntegrator
+        ODEIntegrator::AbstractODEIntegrator
         boundary::Bool
         on::Bool
 end
@@ -65,5 +65,23 @@ end
 # end
 
 
+function Base.show(io::IO, ow::ParticleInstance2D)
+        sys_print = "ParticleEquations2D: u(x,y,t), v(x,y,t)"
+        ODEint = ow.ODEIntegrator
+        print(io, "ParticleInstance2D ", "\n",
+                "├── position_ij: ", ow.position_ij, "\n",
+                "├── position_xy: ", ow.position_xy, "\n",
+                "├── boundary:    ", ow.boundary, "\n",
+                "├── on:          ", ow.on, "\n",
+                "├── ODEIntegrator    \n",
+                "|        ├── model: ", ODEint.model!, "\n",
+                "|        ├── u:     ", ODEint.u, "\n",
+                "|        ├── t:     ", ODEint.t, "\n",
+                "|        └── params: ", ODEint.params, "\n",
+                "└── ODEIntegrator-solver    \n",
+                "         ├── dt:       ", ODEint.dt, "\n",
+                "         ├── has_fsal: ", ODEint.has_fsal, "\n",
+                "         └── err:      ", ODEint.err, "\n")
+end
 
 end

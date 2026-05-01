@@ -9,7 +9,7 @@ using Statistics
 using HDF5, JLD2
 
 using DocStringExtensions
-using DifferentialEquations
+#using OrdinaryDiffEq
 
 using PiCLES.ParticleMesh: OneDGrid, OneDGridNotes
 using PiCLES.Operators.core_1D: ParticleDefaults

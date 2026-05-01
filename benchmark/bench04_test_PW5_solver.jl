@@ -1,5 +1,4 @@
-#using DifferentialEquations
-using OrdinaryDiffEq
+#using OrdinaryDiffEq
 using StaticArrays
 
 

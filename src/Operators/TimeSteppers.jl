@@ -114,8 +114,9 @@ function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, deb
     #print("mean energy before advance ", mean_of_state(model), "\n")
     if debug
         @info "before advance"
-        @info maximum(model.State[:, :, 1]), maximum(model.State[:, :, 2]), maximum(model.State[:, :, 3])
+        # @info maximum(model.State[:, :, 1]), maximum(model.State[:, :, 2]), maximum(model.State[:, :, 3])
         model.FailedCollection = FailedCollection
+        @show model.ParticleCollection[:, 6].on
     end 
 
     time_step!_advance(model, Δt, FailedCollection)
@@ -131,30 +132,33 @@ function time_step!(model::Abstract2DModel, Δt::Float64; callbacks=nothing, deb
     
 
     if debug
-        print("mean energy after advance ", mean_of_state(model), "\n")
+        # print("mean energy after advance, before remesh ", mean_of_state(model), "\n")
 
-        @info "advanced: "
-        @info maximum(model.State[:, :, 1]), maximum(model.State[:, :, 2]), maximum(model.State[:, :, 3])
+        @info "after advance, before remesh: "
+        # @info maximum(model.State[:, :, 1]), maximum(model.State[:, :, 2]), maximum(model.State[:, :, 3])
         #@info model.State[8:12, 1], model.State[8:12, 2]
-        @info model.clock.time, model.ParticleCollection[10].ODEIntegrator.t
-        @info "winds:", model.winds.u(model.ParticleCollection[10].ODEIntegrator.u[4], model.ParticleCollection[10].ODEIntegrator.u[5], model.ParticleCollection[10].ODEIntegrator.t)
+        #@info model.clock.time, model.ParticleCollection[10].ODEIntegrator.t
+        #@info "winds:", model.winds.u(model.ParticleCollection[10].ODEIntegrator.u[4], model.ParticleCollection[10].ODEIntegrator.u[5], model.ParticleCollection[10].ODEIntegrator.t)
+        @show model.ParticleCollection[:, 6].on
     end
 
     #@printf "re-mesh"
-    @threads for a_particle in model.ParticleCollection[model.ocean_points]
-        mapping_2D.remesh!(a_particle, model.State, 
-                        model.winds, model.clock.time, 
-                        model.ODEsettings, Δt,
-                        model.grid.stats, 
-                        model.minimal_state,
-                        model.ODEdefaults)
-    end
+    time_step!_remesh(model, Δt)
+    # @threads for a_particle in model.ParticleCollection[model.ocean_points]
+    #     mapping_2D.remesh!(a_particle, model.State, 
+    #                     model.winds, model.clock.time, 
+    #                     model.ODEsettings, Δt,
+    #                     model.grid.stats, 
+    #                     model.minimal_state,
+    #                     model.ODEdefaults)
+    # end
 
     if debug
-        @info "remeshed: "
+        @info "after remeshed: "
         #@info model.State[8:12, 1], model.State[8:12, 2]
-        @info maximum(model.State[:, :, 1]), maximum(model.State[:, :, 2]), maximum(model.State[:, :, 3])
-        @info model.clock.time, model.ParticleCollection[10].ODEIntegrator.t
+        # @info maximum(model.State[:, :, 1]), maximum(model.State[:, :, 2]), maximum(model.State[:, :, 3])
+        # @info model.clock.time, model.ParticleCollection[10].ODEIntegrator.t
+        @show model.ParticleCollection[:, 6].on
 
     end
     #print("mean energy after remesh ", mean_of_state(model), "\n")
@@ -169,12 +173,19 @@ function time_step!_advance(model::Abstract2DModel, Δt::Float64, FailedCollecti
 
     @threads for a_particle in model.ParticleCollection[model.ocean_points]
         #@info a_particle.position_ij
-        mapping_2D.advance!(    a_particle, model.State, FailedCollection,
-                                model.grid, model.winds, Δt,
-                                model.ODEsettings.log_energy_maximum,
-                                model.ODEsettings.wind_min_squared,
-                                model.periodic_boundary,
-                                model.ODEdefaults)
+        particle_on = a_particle.on
+
+        model.ParticleCollection[a_particle.position_ij[1], a_particle.position_ij[2]] = mapping_2D.advance!(
+                a_particle, model.State, FailedCollection,
+                model.grid, model.winds, Δt,
+                model.ODEsettings.log_energy_maximum,
+                model.ODEsettings.wind_min_squared,
+                model.periodic_boundary,
+                model.ODEdefaults)
+
+        # if (a_particle.position_ij[2] == 6) & (particle_on != a_particle.on)            
+        #     @info "after advance! outside: $(a_particle.position_ij) particle on change :$(particle_on) to $(a_particle.on)"
+        # end
     end
 
 end
@@ -182,12 +193,18 @@ end
 function time_step!_remesh(model::Abstract2DModel, Δt::Float64)
 
     @threads for a_particle in model.ParticleCollection[model.ocean_points]
-        mapping_2D.remesh!(a_particle, model.State, 
+        particle_on = a_particle.on
+        model.ParticleCollection[a_particle.position_ij[1], a_particle.position_ij[2]] = mapping_2D.remesh!(
+                        a_particle, model.State,
                         model.winds, model.clock.time, 
                         model.ODEsettings, Δt,
                         model.grid.stats, 
                         model.minimal_state,
                         model.ODEdefaults)
+        
+        # if (a_particle.position_ij[2] == 6) & (particle_on != a_particle.on)
+        #     @info "after  remesh! outside: $(a_particle.position_ij) particle on change :$(particle_on) to $(a_particle.on)"
+        # end
     end
 
 end
@@ -214,16 +231,7 @@ function movie_time_step!(model::Abstract2DModel, Δt; callbacks=nothing, debug=
     # temporary FailedCollection to store failed particles
     FailedCollection = Vector{AbstractMarkedParticleInstance}([])
 
-    for a_particle in model.ParticleCollection[model.ocean_points]
-        #@show a_particle.position_ij
-        mapping_2D.advance!(a_particle, model.State, FailedCollection,
-            model.grid, model.winds, Δt,
-            model.ODEsettings.log_energy_maximum,
-            model.ODEsettings.wind_min_squared,
-            model.periodic_boundary,
-            model.ODEdefaults)
-
-    end
+    time_step!_advance(model, Δt, FailedCollection)
 
     model.MovieState = copy(model.State)
 
@@ -232,15 +240,7 @@ function movie_time_step!(model::Abstract2DModel, Δt; callbacks=nothing, debug=
     end
 
     #@printf "re-mesh"
-    for a_particle in model.ParticleCollection[model.ocean_points]
-        mapping_2D.remesh!(a_particle, model.State,
-            model.winds, model.clock.time,
-            model.ODEsettings, Δt,
-            model.grid.stats,
-            model.minimal_state,
-            model.ODEdefaults)
-    end
-
+    time_step!_remesh(model, Δt)
     
     model.State .= 0.0
     tick!(model.clock, Δt)

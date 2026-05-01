@@ -414,7 +414,6 @@ compute_weights_and_index4(grid2d, u45S[1], u45S[2])
 
 
 # %%
-# using DifferentialEquations: OrdinaryDiffEq.ODEIntegrator
 # using PiCLES.custom_structures: ParticleInstance2D
 
 # mutable struct ParticleInstance2D_new <: AbstractParticleInstance

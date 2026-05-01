@@ -26,8 +26,10 @@ export
     Grids,
 
     # utils
-    Utils, Debugging, FetchRelations, ParticleTools, WindEmulator
+    Utils, Debugging, FetchRelations, ParticleTools, WindEmulator,
 
+    # Solvers
+    Solvers
 
     #externals
 
@@ -36,6 +38,9 @@ include("Architectures.jl")
 using .Architectures
 
 include("custom_structures.jl")
+
+include("Solvers/Solvers.jl")
+using .Solvers
 
 include("ParticleSystems/ParticleSystems.jl")
 using .ParticleSystems
@@ -63,6 +68,7 @@ using .Utils
 
 
 using .Simulations
+
 
 
 include("Models/Models.jl")

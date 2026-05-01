@@ -1,6 +1,6 @@
 module core_1D
 
-using DifferentialEquations: OrdinaryDiffEq.ODEProblem, init
+#using OrdinaryDiffEq: ODEProblem, init
 
 using SharedArrays
 using DocStringExtensions

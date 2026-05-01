@@ -45,7 +45,7 @@ using BenchmarkTools
 using PiCLES.Grids
 
 using PiCLES.Operators.TimeSteppers: time_step!
-using DifferentialEquations
+#using OrdinaryDiffEq
 using PiCLES.Operators: mapping_2D
 
 
@@ -75,7 +75,7 @@ heatmap(grid.data.x[:, 1], grid.data.y[1, :], transpose(grid.data.mask))
 particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q, 
     propagation=true,
     input=false, 
-    dissipation=false,
+    dissipation=true,
     peak_shift=false,
     direction=false,
     );
@@ -93,27 +93,26 @@ ParticleMin = FetchRelations.MinimalParticle(2, 0, DT)
 # get_initial_windsea(2, 2, DT,particle_state=true )
 
 ODE_settings = PW.ODESettings(
-    Parameters=default_ODE_parameters,
+    Parameters=ODEpars,
     # define mininum energy threshold
-    log_energy_minimum=ParticleMin[1], #log(FetchRelations.Eⱼ(0.1, DT)),
+    log_energy_minimum=lne_local,#log(FetchRelations.Eⱼ(0.1, DT)),
     #maximum energy threshold
     log_energy_maximum=log(27),#log(17),  # correcsponds to Hs about 16 m
-    saving_step=DT,
+    saving_step=6000,
     timestep=DT,
-    total_time=T = 6days,
-    adaptive=true,
-    dt=1e-3, #60*10, 
-    dtmin=1e-4, #60*5, 
-    force_dtmin=true,
-    callbacks=nothing,
-    save_everystep=false)
+    total_time=T = 12days,
+    dt=1e-3,
+    dtmin=1e-4,
+    dtmax=20minutes)
+
 
 
 # %%
+
 function plot_particle_collection(wave_model)
     particles = wave_model.ParticleCollection
     p = plot(layout=(3, 2), size=(1200, 1100))
-    heatmap!(p, transpose(particles.on), subplot=1, title="on | iter=" * string(wave_model.clock.iteration))
+    heatmap!(p, transpose(particles.on), subplot=1, title="on | iter=" * string(wave_model.clock.iteration) * " | total energy = " * string(round(sum(wave_model.State[:, :, 1]), digits=4)))
     heatmap!(p, transpose(particles.boundary), subplot=2, title="boundary")
     heatmap!(p, transpose(wave_model.State[:, :, 1]), subplot=3, title="State: Energy", clims=(0, NaN))
     heatmap!(p, transpose(wave_model.State[:, :, 2]), subplot=4, title="State: x momentum ", clims=(0, NaN))
@@ -122,6 +121,7 @@ function plot_particle_collection(wave_model)
     plot!(p, aspect_ratio=:equal)
     display(p)
 end
+
 
 
 # %%
@@ -191,7 +191,7 @@ wave_simulation.model.State[:,:,1]
 Revise.retry()
 plot_particle_collection(wave_model)
 
-for i in 1:1:180
+for i in 1:1:100
     TimeSteppers.time_step!(wave_simulation.model, wave_simulation.Δt)
 
     if i%8 == 0 
@@ -204,7 +204,3 @@ end
 
 
 # %%
-wave_simulation.model.ParticleCollection[20, 10]
-wave_simulation.model.ParticleCollection[20, 10].ODEIntegrator.u
-
-wave_simulation.model.grid.stats

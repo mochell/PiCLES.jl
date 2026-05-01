@@ -1,4 +1,3 @@
-#using DifferentialEquations
 using StaticArrays
 
 using PiCLES.ParticleSystems: particle_waves_v5 as PW
