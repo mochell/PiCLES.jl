@@ -21,12 +21,15 @@ air–sea coupling.
 
 ## Citing
 
-If PiCLES is useful to you, please cite the JAMES paper:
+If PiCLES is useful to you, please cite the JAMES paper
+([Hell2025](@citet)):
 
-> Hell, M. C., Fox-Kemper, B., & Chapron, B. (2025). *A Particle-in-Cell wave
-> model for efficient sea-state estimates in Earth System Models — PiCLES.*
-> Journal of Advances in Modeling Earth Systems, 17(8).
-> [doi:10.1029/2025MS005221](https://doi.org/10.1029/2025MS005221)
+```@bibliography
+Pages = []
+Canonical = false
+
+Hell2025
+```
 
 The software is archived on Zenodo at
 [doi:10.5281/zenodo.13799205](https://doi.org/10.5281/zenodo.13799205).

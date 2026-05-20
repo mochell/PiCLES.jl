@@ -26,9 +26,9 @@ s_p = \big(\ln\varepsilon,\; \bar c_{g,x},\; \bar c_{g,y},\; x,\; y\big).
 
 ## Governing equations
 
-Particles integrate the Kudryavtsev-type system (Kudryavtsev et al. 2021,
-Hell et al. 2025) for log-energy, energy-weighted group velocity, and
-position:
+Particles integrate the Kudryavtsev-type system
+([Kudryavtsev2021](@citet); [Hell2025](@citet)) for log-energy,
+energy-weighted group velocity, and position:
 
 ```math
 \begin{aligned}
@@ -67,7 +67,7 @@ where ``w_n`` are bilinear (CIC) weights to the surrounding nodes. The
 deposit is purely additive, so it conserves energy and momentum and handles
 sharp gradients and shocks well. The remeshing step is the source of the
 "Particle-in-Cell" name and was originally developed for plasma physics
-(Evans, Harlow, Brackbill et al.).
+([Brackbill1986](@citet); [Harlow1988](@citet)).
 
 ## Why this is fast
 
@@ -95,12 +95,7 @@ Most of these cases live as scripts under `test/T03_*.jl` and
 
 ## References
 
-- Hell, M. C., Fox-Kemper, B., & Chapron, B. (2025). A Particle-in-Cell wave
-  model for efficient sea-state estimates in Earth System Models — PiCLES.
-  *J. Adv. Model. Earth Syst.*, 17(8).
-  [doi:10.1029/2025MS005221](https://doi.org/10.1029/2025MS005221)
-- Kudryavtsev, V., Yurovskaya, M., & Chapron, B. (2021). 2D Parametric Model
-  for Surface Wave Development Under Varying Wind Field in Space and Time.
-  *J. Geophys. Res.: Oceans*, 126.
-- Hell, M. C., Ayet, A., & Chapron, B. (2021). Swell Generation Under
-  Extra-Tropical Storms. *J. Geophys. Res.: Oceans*, 126.
+```@bibliography
+Pages = ["model.md"]
+Canonical = false
+```
