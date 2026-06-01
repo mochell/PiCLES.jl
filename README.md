@@ -1,4 +1,9 @@
-# Particle-in-Cell for Efficient Swell - PiCLES ![Build Status](https://github.com/mochell/PiCLES.jl/actions/workflows/CI.yml/badge.svg?branch=main)
+# Particle-in-Cell for Efficient Swell - PiCLES
+
+[![CI](https://github.com/mochell/PiCLES.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/mochell/PiCLES.jl/actions/workflows/CI.yml)
+[![Documentation](https://github.com/mochell/PiCLES.jl/actions/workflows/Documentation.yml/badge.svg?branch=main)](https://mochell.github.io/PiCLES.jl/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 PiCLES is a fast and efficient wave model for Earth System Models, using Particle-in-Cell methods for better performance.
 
 

@@ -1,6 +1,5 @@
-#using PiCLES
 using Test
 
-@testset "PiCLES.jl" begin
-    # Write your tests here.
+@testset "PiCLES" begin
+    include("smoke.jl")
 end
