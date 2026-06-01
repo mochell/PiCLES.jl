@@ -167,8 +167,6 @@ function reinit_PI!(PI::AbstractParticleInstance, u::CC, t, ODE_settings) where 
                 dtmin   =ODE_settings.dtmin,
                 dtmax   =ODE_settings.dtmax)
 end
-
-
 ######### Core routines for advancing and remeshing
 
 """
@@ -178,60 +176,7 @@ function advance!(PI::AbstractParticleInstance,
                         S::StateTypeL1,
                         Failed::Vector{AbstractMarkedParticleInstance},
                         Grid::Union{Grid2D,MeshGrids},
-                        forcing::FF,
-                        DT::Float64, 
-                        log_energy_maximum::Float64,
-                        wind_min_squared::Float64,
-                        periodic_boundary::Bool, 
-                        default_particle::PP,
-                        ) where {PP<:Union{ParticleDefaults,Nothing},FF<:Union{ForcingCollection,ForcingData,NamedTuple{(:u, :v)}}}
-        return advance!(
-                PI,
-                S,
-                Failed,
-                Grid,
-                forcing,
-                nothing,
-                DT,
-                log_energy_maximum,
-                wind_min_squared,
-                periodic_boundary,
-                default_particle,
-        )
-end
-
-function advance!(PI::AbstractParticleInstance,
-                        S::StateTypeL1,
-                        Failed::Vector{AbstractMarkedParticleInstance},
-                        Grid::Union{Grid2D,MeshGrids},
-                        winds_i::Tuple{Float64,Float64},
-                        DT::Float64,
-                        log_energy_maximum::Float64,
-                        wind_min_squared::Float64,
-                        periodic_boundary::Bool,
-                        default_particle::PP,
-                        ) where {PP<:Union{ParticleDefaults,Nothing}}
-        return advance!(
-                PI,
-                S,
-                Failed,
-                Grid,
-                nothing,
-                winds_i,
-                DT,
-                log_energy_maximum,
-                wind_min_squared,
-                periodic_boundary,
-                default_particle,
-        )
-end
-
-function advance!(PI::AbstractParticleInstance,
-                        S::StateTypeL1,
-                        Failed::Vector{AbstractMarkedParticleInstance},
-                        Grid::Union{Grid2D,MeshGrids},
-                        forcing::Union{FF,Nothing},
-                        winds_i::Union{Nothing,Tuple{Float64,Float64}},
+                        wind_i::FF,
                         DT::Float64, 
                         log_energy_maximum::Float64,
                         wind_min_squared::Float64,
@@ -241,10 +186,7 @@ function advance!(PI::AbstractParticleInstance,
         #@show PI.position_ij
 
         #if ~PI.boundary # if point is not a 
-        t_start  =  copy(PI.ODEIntegrator.t)
-        # add_saveat!(PI.ODEIntegrator, PI.ODEIntegrator.t )
-        # savevalues!(PI.ODEIntegrator)
-        
+
         # set the position in particle state vector either to the node position or to the relative position in the CartesianGrid
         if typeof(Grid) <: MeshGrids
                 xy = (0.0,0.0)
@@ -256,7 +198,10 @@ function advance!(PI::AbstractParticleInstance,
                 @info "advance: no grid detected"
         end
 
+        winds_i_local = convert(Tuple{Float64,Float64},wind_i)::Tuple{Float64,Float64}
+        winds_i_local_end = convert(Tuple{Float64,Float64},wind_i)::Tuple{Float64,Float64} # <--- this should be at final time after advanced. Not implimented yet.
 
+        # winds_i_local::Tuple{Float64,Float64} = _wind_uv(forcing, PI.position_xy[1], PI.position_xy[2], ti)
         # advance particle
         if PI.on #& ~PI.boundary # if Particle is on and not boundary
         
@@ -268,9 +213,7 @@ function advance!(PI::AbstractParticleInstance,
                         print("- error message: $(e)\n")
                         print("- push to failed\n")
                         print("- state of particle: $(PI.ODEIntegrator.u)\n")
-                        uw, vw = isnothing(winds_i) ?
-                                _wind_uv(forcing, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5], PI.ODEIntegrator.t) :
-                                winds_i
+                        uw, vw = winds_i_local
                         print("- winds are: $(uw)\n")
                         print("- winds are: $(vw)\n")
                         push!(Failed,
@@ -286,13 +229,8 @@ function advance!(PI::AbstractParticleInstance,
         
         elseif ~PI.on #& ~PI.boundary # particle is off, test if there was windsea
 
-                t_end = t_start + DT
-                wind_end = isnothing(winds_i) ?
-                        convert(Tuple{Float64,Float64}, _wind_uv(forcing, PI.position_xy[1], PI.position_xy[2], t_end))::Tuple{Float64,Float64} :
-                        winds_i
-
                 # test if winds where strong enough
-                if speed_square(wind_end[1], wind_end[2]) >= wind_min_squared
+                if speed_square(winds_i_local_end[1], winds_i_local_end[2]) >= wind_min_squared
                         # winds are large eneough, reinit
                         ui = ResetParticleValues(default_particle, xy, wind_end, DT)
                         reset_PI_u!(PI, ui =ui)
@@ -313,13 +251,8 @@ function advance!(PI::AbstractParticleInstance,
                 @info PI.position_ij
                 @show PI
                 
-                t_end = t_start + DT
-                winds_start = isnothing(winds_i) ?
-                        convert(Tuple{Float64,Float64}, _wind_uv(forcing, PI.position_xy[1], PI.position_xy[2], t_end))::Tuple{Float64,Float64} :
-                        winds_i
-                @show winds_start
-
-                ui = ResetParticleValues(default_particle, xy, winds_start, DT)
+                @show winds_i_local_end
+                ui = ResetParticleValues(default_particle, xy, winds_i_local_end, DT)
                 @show PI.ODEIntegrator.u
                 reset_PI_u!(PI, ui=ui)
 
@@ -327,20 +260,12 @@ function advance!(PI::AbstractParticleInstance,
                 @info "position or Energy is inf"
                 @show PI
 
-                winds_start = isnothing(winds_i) ?
-                        convert(Tuple{Float64,Float64}, _wind_uv(forcing, PI.position_xy[1], PI.position_xy[2], t_start))::Tuple{Float64,Float64} :
-                        winds_i
-
-                ui = ResetParticleValues(default_particle, xy, winds_start, DT)
+                ui = ResetParticleValues(default_particle, xy, winds_i_local, DT)
                 reset_PI_u!(PI, ui=ui)
 
         elseif PI.ODEIntegrator.u[1] > log_energy_maximum
                 @info "e_max_log is reached"
                 #@show PI
-
-                # winds_start = convert(Tuple{Float64,Float64},
-                #                         (winds.u(PI.position_xy[1], PI.position_xy[2], t_start),
-                #                         winds.v(PI.position_xy[1], PI.position_xy[2], t_start)))::Tuple{Float64,Float64}
 
                 ui = PI.ODEIntegrator.u
                 ui[1] = log_energy_maximum
@@ -363,13 +288,14 @@ end
         - pushes the Node State to particle instance
 """
 function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
-                forcing::FF,
+                wind_i::FF,
                 ti::Number, 
                 ODEs::AbstractODESettings, DT::Float64,  #
                 grid_stats::AbstractGridStatistics,
                 minimal_state::Vector{Float64},
                 default_particle::PP) where {PP<:Union{ParticleDefaults,Nothing},FF<:Union{ForcingCollection,ForcingData,NamedTuple{(:u, :v)}}}        
-        winds_i_local::Tuple{Float64,Float64} = _wind_uv(forcing, PI.position_xy[1], PI.position_xy[2], ti)
+
+        winds_i_local::Tuple{Float64,Float64} = wind_i#_wind_uv(forcing, PI.position_xy[1], PI.position_xy[2], ti)
 
         PI = NodeToParticle!(PI, S,
                         winds_i_local,
@@ -378,48 +304,6 @@ function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
                         ODEs.wind_min_squared,
                         default_particle,
                         ODEs.log_energy_minimum,
-                        ODEs.dt,
-                        DT)
-        return PI
-end
-
-function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
-                winds_i::Tuple{Float64,Float64},
-                ti::Number,
-                ODEs::AbstractODESettings, DT::Float64,
-                grid_stats::AbstractGridStatistics,
-                minimal_state::Vector{Float64},
-                default_particle::PP) where {PP<:Union{ParticleDefaults,Nothing}}
-        PI = NodeToParticle!(PI, S,
-                        winds_i,
-                        grid_stats,
-                        minimal_state,
-                        ODEs.wind_min_squared,
-                        default_particle,
-                        ODEs.log_energy_minimum,
-                        ODEs.dt,
-                        DT)
-        return PI
-end
-
-function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
-                forcing::Union{FF,Nothing},
-                winds_i::Union{Nothing,Tuple{Float64,Float64}},
-                ti::Number, 
-                ODEs::AbstractODESettings, DT::Float64,  #
-                grid_stats::AbstractGridStatistics,
-                minimal_state::Vector{Float64},
-                default_particle::PP) where {PP<:Union{ParticleDefaults,Nothing},FF<:Union{ForcingCollection,ForcingData,NamedTuple{(:u, :v)}}}        
-                
-        winds_i_local::Tuple{Float64,Float64} = isnothing(winds_i) ? _wind_uv(forcing, PI.position_xy[1], PI.position_xy[2], ti) : winds_i
-        
-        PI = NodeToParticle!(PI, S, 
-                        winds_i_local, 
-                        grid_stats,
-                        minimal_state,
-                        ODEs.wind_min_squared,
-                        default_particle, 
-                        ODEs.log_energy_minimum, 
                         ODEs.dt,
                         DT)
         return PI
@@ -448,21 +332,17 @@ function NodeToParticle!(PI::AbstractParticleInstance, S::StateTypeL1,
 
         if typeof(grid_stats) <: MeshGridStatistics
                 xy = ( 0.0, 0.0 )
-                # if (PI.position_ij == (10, 10)) | (PI.position_ij == (40, 10))
-                #         @info "NodeToParticle!: CartesianGridStatistics"
-                # end
         else
                 xy = PI.position_xy
-                # if (PI.position_ij == (10, 10)) | (PI.position_ij == (40, 10))
-                #         @info "NodeToParticle!: Standard grid"
-                # end
         end
 
+        speed_square_local = speed_square(wind_tuple[1], wind_tuple[2])
         # on_before = PI.on
         last_t = PI.ODEIntegrator.t
         # minimal_state[1] is the minimal Energy  
         # minimal_state[2] is the minimal momentum squared  
-        if ~PI.boundary & (u_state[1] >= minimal_state[1]) & (speed_square(u_state[2], u_state[3]) >= minimal_state[2]) # all integrior nodes: convert note to particle values and push to ODEIntegrator
+        if ~PI.boundary & (u_state[1] >= minimal_state[1]) & (speed_square_local >= minimal_state[2]) 
+                # all integrior nodes: convert note to particle values and push to ODEIntegrator
 
                 #@show "u_state", u_state
                 ui = GetVariablesAtVertex(u_state, xy[1], xy[2])
@@ -470,37 +350,25 @@ function NodeToParticle!(PI::AbstractParticleInstance, S::StateTypeL1,
                 reset_PI_ut!(PI, ui, last_t; dt_init=dt_init)
                 PI.on = true
 
-                #@show PI.ODEIntegrator.t, PI.ODEIntegrator.u
-                
-        elseif ~PI.boundary & (speed_square(wind_tuple[1], wind_tuple[2]) >= wind_min_squared) #minimal windsea is too small but local winds are strong enough  #(u_state[1] < exp(e_min_log)) | PI.boundary
-                # test if particle is below energy threshold, or
-                #      if particle is at the boundary
+        elseif ~PI.boundary & (speed_square_local >= wind_min_squared) 
+                #minimal windsea is too small but local winds are strong enough  #(u_state[1] < exp(e_min_log)) | PI.boundary
 
                 ui = ResetParticleValues(default_particle, xy, wind_tuple, DT) # returns winds sea given DT and winds
-
-                # OrdinaryDiffEq reinit method, creates new integrator instance, resets cache, and erases solution history 
-                # reinit!(PI.ODEIntegrator, ui, erase_sol=false, reset_dt=true, reinit_cache=true)#, reinit_callbacks=true)
-                # reset_PI_t!(PI, ti=last_t)
-
-                # new stuff
                 reset_PI_ut!(PI, ui, last_t; dt_init=dt_init)
 
                 PI.on = true
 
-        elseif PI.boundary & (speed_square(wind_tuple[1], wind_tuple[2]) >= wind_min_squared) # at the boundary, reset particle if winds are strong enough
+        elseif PI.boundary & (speed_square_local >= wind_min_squared) 
+                # at the boundary, reset particle if winds are strong enough
 
                 ui = ResetParticleValues(default_particle, xy, wind_tuple, DT) # returns winds sea given DT and winds
-
-                # OrdinaryDiffEq reinit method, creates new integrator instance, resets cache, and erases solution history 
-                # reinit!(PI.ODEIntegrator, ui, erase_sol=false, reset_dt=true, reinit_cache=true)#, reinit_callbacks=true)
-                # reset_PI_t!(PI, ti=last_t)
-
                 reset_PI_ut!(PI, ui, last_t; dt_init=dt_init)
                 # @info default_particle, ui
                 PI.on = true
+
         elseif (u_state[1] >= minimal_state[1])
                 ui = GetVariablesAtVertex(u_state, xy[1], xy[2])
-                #@info exp(ui[1]), ui[2], ui[4]/1e3, ui[5]/1e3              
+
                 reset_PI_ut!(PI, ui, last_t; dt_init=dt_init)
                 PI.on = true
 

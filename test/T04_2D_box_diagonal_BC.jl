@@ -3,8 +3,6 @@
 using Pkg
 Pkg.activate("PiCLES/")
 
-using Pkg
-Pkg.activate(".")
 
 #using Plots
 import Plots as plt

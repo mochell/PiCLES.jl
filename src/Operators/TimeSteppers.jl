@@ -116,8 +116,6 @@ function time_step!(model::Abstract1DModel, Δt; callbacks=nothing, debug=false)
     tick!(model.clock, Δt)
 end
 
-
-
 ################# 2D ####################
 
 """
@@ -132,8 +130,11 @@ callbacks are not implimented yet
 
 """
 function time_step!(model::Abstract2DModel, Δt::Float64; forcing=nothing, callbacks=nothing, debug=false)
+    
+    #
     current_forcing = forcing === nothing ? (hasproperty(model, :winds) ? getproperty(model, :winds) : nothing) : forcing
     current_forcing === nothing && error("2D time_step! requires forcing data (pass `forcing=...` to Simulation or set `model.winds`)")
+
     forcing_xy = time_slice_forcing(current_forcing, model.clock.time)
 
     # temporary FailedCollection to store failed particles
@@ -197,19 +198,20 @@ function time_step!(model::Abstract2DModel, Δt::Float64; forcing=nothing, callb
 
 end
 
-function time_step!_advance(model::Abstract2DModel, Δt::Float64, forcing, FailedCollection::Vector{AbstractMarkedParticleInstance})
+function time_step!_advance(model::Abstract2DModel, Δt::Float64, forcing_xy, FailedCollection::Vector{AbstractMarkedParticleInstance})
 
     @threads for a_particle in model.ParticleCollection[model.ocean_points]
         #@info a_particle.position_ij
         particle_on = a_particle.on
-        winds_i = (
-            forcing.u(a_particle.position_xy[1], a_particle.position_xy[2], model.clock.time),
-            forcing.v(a_particle.position_xy[1], a_particle.position_xy[2], model.clock.time),
+
+        wind_i = (
+            forcing_xy.u(a_particle.position_xy[1], a_particle.position_xy[2], model.clock.time),
+            forcing_xy.v(a_particle.position_xy[1], a_particle.position_xy[2], model.clock.time),
         )
 
         model.ParticleCollection[a_particle.position_ij[1], a_particle.position_ij[2]] = mapping_2D.advance!(
                 a_particle, model.State, FailedCollection,
-            model.grid, winds_i, Δt,
+                model.grid, wind_i, Δt,
                 model.ODEsettings.log_energy_maximum,
                 model.ODEsettings.wind_min_squared,
                 model.periodic_boundary,
@@ -222,17 +224,17 @@ function time_step!_advance(model::Abstract2DModel, Δt::Float64, forcing, Faile
 
 end
 
-function time_step!_remesh(model::Abstract2DModel, Δt::Float64, forcing)
+function time_step!_remesh(model::Abstract2DModel, Δt::Float64, forcing_xy)
 
     @threads for a_particle in model.ParticleCollection[model.ocean_points]
         particle_on = a_particle.on
-        winds_i = (
-            forcing.u(a_particle.position_xy[1], a_particle.position_xy[2], model.clock.time),
-            forcing.v(a_particle.position_xy[1], a_particle.position_xy[2], model.clock.time),
+        wind_i = (
+            forcing_xy.u(a_particle.position_xy[1], a_particle.position_xy[2], model.clock.time),
+            forcing_xy.v(a_particle.position_xy[1], a_particle.position_xy[2], model.clock.time),
         )
         model.ParticleCollection[a_particle.position_ij[1], a_particle.position_ij[2]] = mapping_2D.remesh!(
                         a_particle, model.State,
-                        winds_i, model.clock.time, 
+                        wind_i, model.clock.time, 
                         model.ODEsettings, Δt,
                         model.grid.stats, 
                         model.minimal_state,
