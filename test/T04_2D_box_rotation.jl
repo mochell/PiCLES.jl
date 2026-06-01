@@ -4,7 +4,7 @@ Pkg.activate("PiCLES/")
 import Plots as plt
 using Setfield, IfElse
 
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 
 using PiCLES
 
@@ -27,6 +27,7 @@ using GLMakie
 
 using PiCLES.Operators.core_2D: GetGroupVelocity, speed
 using PiCLES.Plotting.movie: init_movie_2D_box_plot, init_movie_2D_box_plot_small
+using Revise
 
 # debugging:
 #using ProfileView
@@ -72,10 +73,11 @@ v_func(x, y, t) = V10 * exp(-(x - center)^2 / u_std^2) * exp(-(y - center)^2 / v
 # u(x, y, t) = x * 0 + y * 0 + t * 0/ DT + 5.0
 # v(x, y, t) = x * 0 + y * 0 + t * 0/ DT + 10.0
 
-u(x, y, t) = u_func(x, y, t)
-v(x, y, t) = v_func(x, y, t)
-winds = (u=u, v=v)
+# u(x, y, t) = u_func(x, y, t)
+# v(x, y, t) = v_func(x, y, t)
+#winds = (u=u, v=v)
 
+forcing = PiCLES.custom_structures.ForcingCollection(u_wind=u_func, v_wind=v_func)
 
 grid = PiCLES.Grids.CartesianGrid.TwoDCartesianGridMesh(100e3, 81, 100e3, 81)
 
@@ -85,7 +87,7 @@ Revise.retry()
 
 #ProfileView.@profview 
 #ProfileView.@profview 
-particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q, input=true, dissipation=true);
+particle_system = PW.particle_equations(γ=Const_ID.γ, q=Const_ID.q, input=true, dissipation=true);
 #particle_equations = PW3.particle_equations_vec5(u, v, u, v, γ=Const_ID.γ, q=Const_ID.q);
 
 
@@ -115,7 +117,7 @@ ODE_settings = PW.ODESettings(
 # %%
 Revise.retry()
 wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
-    winds=winds,
+    winds=nothing,
     ODEsys=particle_system,
     ODEsets=ODE_settings,  # ODE_settings
     ODEinit_type="wind_sea",  # default_ODE_parameters
@@ -126,7 +128,7 @@ wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
     movie=true)
 
 
-wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=24hours)#1hours)
+wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=24hours, forcing=forcing)#1hours)
 initialize_simulation!(wave_simulation)
 
 #reset_simulation!(wave_simulation, particle_initials=copy(wave_model.ODEdefaults))
@@ -137,12 +139,12 @@ fig, n = init_movie_2D_box_plot_small(wave_simulation, name_string="Rotating Sta
 
 #wave_simulation.stop_time += 1hour
 N =  60 *8
-record(fig, save_path*"T02_2D_totating_winds_nonper_small.gif", 1:N, framerate=10) do i
+record(fig, save_path*"T02_2D_rotating_winds_nonper_small.gif", 1:N, framerate=10) do i
     @info "Plotting frame $i of $N..."
     #@time for _ = 1:10
     #run!(wave_simulation, store=false)
     @info wave_simulation.model.clock
-    movie_time_step!(wave_simulation.model, wave_simulation.Δt)
+    movie_time_step!(wave_simulation.model, wave_simulation.Δt; forcing=wave_simulation.forcing)
     #end
     n[] = 1
 end

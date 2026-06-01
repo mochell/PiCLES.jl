@@ -10,6 +10,24 @@ SphericalGrid, SphericalGridStatistics, SphericalGrid2D
 
 import Oceananigans.Utils: prettytime
 
+_as_wind_function(field) = field isa Function ? field : (x, y, t) -> field
+
+function _movie_winds(wave_simulation)
+    if hasproperty(wave_simulation.model, :winds)
+        winds = getproperty(wave_simulation.model, :winds)
+        if winds !== nothing
+            return _as_wind_function(winds.u), _as_wind_function(winds.v)
+        end
+    end
+
+    forcing = hasproperty(wave_simulation, :forcing) ? getproperty(wave_simulation, :forcing) : nothing
+    if forcing !== nothing
+        return _as_wind_function(forcing.u_wind), _as_wind_function(forcing.v_wind)
+    end
+
+    error("No winds available for movie plotting: set `model.winds` or `simulation.forcing`.")
+end
+
 function init_movie_2D_box_plot(wave_simulation; resolution=(900, 1200), name_string="", aspect=1, axline=0)
 
     n = Observable(1) # for visualization
@@ -29,7 +47,7 @@ function init_movie_2D_box_plot(wave_simulation; resolution=(900, 1200), name_st
     arrow_skip_y =2
 
     model_time = @lift ($n; wave_simulation.model.clock.time)
-    uo, vo = wave_simulation.model.winds
+    uo, vo = _movie_winds(wave_simulation)
     # ocean_wind_u = @lift(uo.(grid.data.x[1:arrow_skip:end], grid.data.y[1:arrow_skip:end], $model_time))
     # ocean_wind_v = @lift(vo.(grid.data.x[1:arrow_skip:end], grid.data.y[1:arrow_skip:end], $model_time))
 
@@ -145,7 +163,7 @@ function init_movie_2D_box_plot_small(wave_simulation; resolution=(1100, 900), n
     arrow_skip_y = 5
 
     model_time = @lift ($n; wave_simulation.model.clock.time)
-    uo, vo     = wave_simulation.model.winds
+    uo, vo = _movie_winds(wave_simulation)
     # ocean_wind_u = @lift(uo.(grid.data.x[1:arrow_skip:end], grid.data.y[1:arrow_skip:end], $model_time))
     # ocean_wind_v = @lift(vo.(grid.data.x[1:arrow_skip:end], grid.data.y[1:arrow_skip:end], $model_time))
 
@@ -273,7 +291,7 @@ function init_movie_2D_rectangle(wave_simulation; resolution=(900, 1200), name_s
     arrow_skip_y = 10
 
     model_time = @lift ($n; wave_simulation.model.clock.time)
-    uo, vo = wave_simulation.model.winds
+    uo, vo = _movie_winds(wave_simulation)
     # ocean_wind_u = @lift(uo.(grid.data.x[1:arrow_skip:end], grid.data.y[1:arrow_skip:end], $model_time))
     # ocean_wind_v = @lift(vo.(grid.data.x[1:arrow_skip:end], grid.data.y[1:arrow_skip:end], $model_time))
 
@@ -413,7 +431,7 @@ function init_movie_2D_simple(wave_simulation; resolution=(900, 1200), name_stri
     arrow_skip_y = arrow_skip
 
     model_time = @lift ($n; wave_simulation.model.clock.time)
-    uo, vo = wave_simulation.model.winds
+    uo, vo = _movie_winds(wave_simulation)
     # ocean_wind_u = @lift(uo.(grid.data.x[1:arrow_skip:end], grid.data.y[1:arrow_skip:end], $model_time))
     # ocean_wind_v = @lift(vo.(grid.data.x[1:arrow_skip:end], grid.data.y[1:arrow_skip:end], $model_time))
 

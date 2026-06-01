@@ -1,9 +1,10 @@
-
+using Pkg
+Pkg.activate("PiCLES/")
 
 import Plots as plt
 using Setfield, IfElse
 
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 
 import PiCLES: FetchRelations, ParticleTools
 using PiCLES.Operators.core_2D: ParticleDefaults, InitParticleInstance, GetGroupVelocity
@@ -13,6 +14,7 @@ using PiCLES.Operators.TimeSteppers: time_step!, movie_time_step!
 
 using PiCLES.ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
 using PiCLES.Models.WaveGrowthModels2D
+using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh
 
 using Oceananigans.TimeSteppers: Clock, tick!
 import Oceananigans: fields
@@ -24,6 +26,7 @@ using GLMakie
 
 using PiCLES.Operators.core_2D: GetGroupVelocity, speed
 using PiCLES.Plotting.movie: init_movie_2D_box_plot
+using Revise
 
 # %%
 #sign.(rand(-1:1, 10, 10))
@@ -44,9 +47,7 @@ ODEpars, Const_ID, Const_Scg = PW.ODEParameters(r_g=0.85)
 
 
 # define grid
-grid = TwoDGrid(260e3, 66, 80e3, 21)
-mesh = TwoDGridMesh(grid, skip=1);
-gn = TwoDGridNotes(grid);
+grid = TwoDCartesianGridMesh(260e3, 66, 80e3, 21, periodic_boundary=(false, true))
 
 # example user function
 u_func(x, y, t) = U10 + x * 0 + y * 0 + t * 0
@@ -59,29 +60,26 @@ winds = (u=u, v=v)
 
 
 # define ODE system and parameters
-particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q);
+particle_system = PW.particle_equations(γ=Const_ID.γ, q=Const_ID.q);
 
 Revise.retry()
 # Default initial conditions based on timestep and chaeracteristic wind velocity
 WindSeamin = FetchRelations.MinimalWindsea(U10, V10, DT)
-default_particle = ParticleDefaults(WindSeamin["lne"], WindSeamin["cg_bar_x"], WindSeamin["cg_bar_y"], 0.0, 0.0)
+default_particle = ParticleDefaults(log(WindSeamin["E"]), WindSeamin["cg_bar_x"], WindSeamin["cg_bar_y"], 0.0, 0.0)
 
 # ... and ODESettings
 ODE_settings = PW.ODESettings(
     Parameters=ODEpars,
     # define mininum energy threshold
-    log_energy_minimum=WindSeamin["lne"],
+    log_energy_minimum=log(WindSeamin["E"]),
     #maximum energy threshold
     log_energy_maximum=log(27),#log(17),  # correcsponds to Hs about 16 m
     saving_step=DT,
     timestep=DT,
     total_time=T = 6days,
-    adaptive=true,
     dt=1e-3, #60*10, 
     dtmin=1e-4, #60*5, 
-    force_dtmin=true,
-    callbacks=nothing,
-    save_everystep=false)
+    dtmax=20minutes)
 
 
 # %%
@@ -124,12 +122,12 @@ for (U10, V10) in gridmesh
     @show U10, V10
 
     x0 =50e3
-    Lx = (gn.Nx - 1) * gn.dx
+    Lx = maximum(grid.data.x) - minimum(grid.data.x)
     # u_func(x, y, t) = IfElse.ifelse.(x .< x0, U10, U10 * (1 -x/Lx) ) + y * 0 + t * 0
     # v_func(x, y, t) = IfElse.ifelse.(x .< x0, V10, V10 * (1 -x/Lx) ) + y * 0 + t * 0
 
-    u_func(x, y, t) = IfElse.ifelse.(x .< x0, x*0+ 0.1, U10 * (x - x0) / (Lx-x0)) + y * 0 + t * 0
-    v_func(x, y, t) = IfElse.ifelse.(x .< x0, x*0+ 0.1, V10 * (x - x0) / (Lx-x0)) + y * 0 + t * 0
+    u_func(x, y, t) = IfElse.ifelse.(x .< x0, x*0.0, U10 * (x - x0) / (Lx-x0)) + y * 0 + t * 0
+    v_func(x, y, t) = IfElse.ifelse.(x .< x0, x*0.0, V10 * (x - x0) / (Lx-x0)) + y * 0 + t * 0
 
     u(x, y, t) = u_func(x, y, t)
     v(x, y, t) = v_func(x, y, t)
@@ -137,7 +135,7 @@ for (U10, V10) in gridmesh
 
     #winds, u, v  =convert_wind_field_functions(u_func, v_func, x, y, t)
 
-    particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q)
+    particle_system = PW.particle_equations(γ=Const_ID.γ, q=Const_ID.q)
 
     ## Define wave model
     wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
@@ -151,7 +149,7 @@ for (U10, V10) in gridmesh
         # minimal_state=FetchRelations.MinimalState(2, 2, DT) * 1,
         movie=true)
 
-    make_reg_test(wave_model, save_path, plot_name="T02_2D_growing_U" * string(U10) * "_V" * string(V10), N=20, axline=x0/1e3)
+    make_reg_test(wave_model, save_path, plot_name="T02_2D_growing_U" * string(U10) * "_V" * string(V10), N=40, axline=x0/1e3)
 end
 
 # %%
@@ -162,7 +160,7 @@ for (U10, V10) in gridmesh
     @show U10, V10
 
     x0 =50e3
-    Lx = (gn.Nx - 1) * gn.dx
+    Lx = maximum(grid.data.x) - minimum(grid.data.x)
     u_func(x, y, t) = IfElse.ifelse.(x .< x0, U10, U10 * (1 -x/Lx) ) + y * 0 + t * 0 + 0.1
     v_func(x, y, t) = IfElse.ifelse.(x .< x0, V10, V10 * (1 -x/Lx) ) + y * 0 + t * 0 + 0.1
 
@@ -174,7 +172,7 @@ for (U10, V10) in gridmesh
 
     #winds, u, v  =convert_wind_field_functions(u_func, v_func, x, y, t)
 
-    particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q)
+    particle_system = PW.particle_equations(γ=Const_ID.γ, q=Const_ID.q)
 
     ## Define wave model
     wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
@@ -200,7 +198,7 @@ for (U10, V10) in gridmesh
     @show U10, V10
 
     x0 =130e3
-    Lx = (gn.Nx - 1) * gn.dx
+    Lx = maximum(grid.data.x) - minimum(grid.data.x)
     u_func(x, y, t) = IfElse.ifelse.(x .< x0, U10, -U10 ) + y * 0 + t * 0 + 0.1
     v_func(x, y, t) = IfElse.ifelse.(x .< x0, V10, -V10 ) + y * 0 + t * 0 + 0.1
 
@@ -212,7 +210,7 @@ for (U10, V10) in gridmesh
 
     #winds, u, v  =convert_wind_field_functions(u_func, v_func, x, y, t)
 
-    particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q)
+    particle_system = PW.particle_equations(γ=Const_ID.γ, q=Const_ID.q)
 
     ## Define wave model
     wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
