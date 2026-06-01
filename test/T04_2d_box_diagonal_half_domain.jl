@@ -3,14 +3,13 @@
 using Pkg
 Pkg.activate("PiCLES/")
 
-using Pkg
-Pkg.activate(".")
 
 #using Plots
 import Plots as plt
 using Setfield, IfElse
 
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 
 import PiCLES: FetchRelations, ParticleTools
 using PiCLES.Operators.core_2D: ParticleDefaults, InitParticleInstance, GetGroupVelocity
@@ -70,8 +69,8 @@ ODEpars, Const_ID, Const_Scg = PW.ODEParameters(r_g=0.85)
 #                             0.0,
 #                             -0.0)
 
-u_func(x, y, t) = IfElse.ifelse.(x .< y, U10, 0.2) + y * 0 + t * 0
-v_func(x, y, t) = IfElse.ifelse.(x .< y, V10, 0.2) + y * 0 + t * 0
+u_func(x, y, t) = IfElse.ifelse.(x .< y, U10, 0.0) + y * 0 + t * 0
+v_func(x, y, t) = IfElse.ifelse.(x .< y, V10, 0.0) + y * 0 + t * 0
 
 # this shuold hopefully work
 # u(x, y, t) = x * 0 + y * 0 + t * 0/ DT + 5.0
@@ -79,7 +78,7 @@ v_func(x, y, t) = IfElse.ifelse.(x .< y, V10, 0.2) + y * 0 + t * 0
 
 u(x, y, t) = u_func(x, y, t)
 v(x, y, t) = v_func(x, y, t)
-winds = (u=u, v=v)
+forcing = PiCLES.custom_structures.ForcingCollection(u_wind=u, v_wind=v)
 
 
 # grid = TwoDGrid(100e3, 51, 100e3, 51)
@@ -93,11 +92,10 @@ grid = TwoDCartesianGridMesh(100e3, 51, 100e3, 51, periodic_boundary=(false, tru
 Revise.retry()
 
 # define variables based on particle equation
-particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q, input=true, dissipation=true);
+particle_system = PW.particle_equations(γ=Const_ID.γ, q=Const_ID.q, input=true, dissipation=true);
 
-# define V4 parameters absed on Const NamedTuple:
-default_ODE_parameters = (r_g=r_g0, C_α=Const_Scg.C_alpha,
-    C_φ=Const_ID.c_β, C_e=Const_ID.C_e, g=9.81);
+# define V6 parameters
+default_ODE_parameters = ODEpars
 
 # define setting and standard initial conditions
 WindSeamin = FetchRelations.MinimalWindsea(U10, V10, DT);
@@ -116,12 +114,12 @@ ODE_settings = PW.ODESettings(
     saving_step=dt_ODE_save,
     timestep=DT,
     total_time=T = 6days,
-    adaptive=true,
-    dt=1e-3, #60*10, 
-    dtmin=1e-4, #60*5, 
-    force_dtmin=true,
-    callbacks=nothing,
-    save_everystep=false)
+    solver=nothing,
+    reltol=1e-3,
+    abstol=1e-4,
+    dt=1e-3,
+    dtmin=1e-4,
+    dtmax=20minutes)
 
 
 default_particle = ParticleDefaults(lne_local, cg_u_local, cg_v_local, 0.0, 0.0)
@@ -135,7 +133,8 @@ Revise.retry()
 
 
 wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
-    winds=winds,
+    winds=(u=forcing.u_wind, v=forcing.v_wind),
+    # winds=nothing,
     ODEsys=particle_system,
     ODEsets=ODE_settings,  # ODE_settings
     ODEinit_type="wind_sea",  # default_ODE_parameters
@@ -146,8 +145,8 @@ wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
 
 
 ### build Simulation
-#wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=4hours)#1hours)
-wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=6hour)#1hours)
+wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=4hours)#1hours)
+# wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=6hour, forcing=forcing)#1hours)
 initialize_simulation!(wave_simulation)
 
 
@@ -159,7 +158,20 @@ initialize_simulation!(wave_simulation)
 # run simulation
 #ProfileView.@profview run!(wave_simulation, cash_store=true, debug=true)
 
+# %%
+xx = wave_simulation.model.grid.data.x
+yy = wave_simulation.model.grid.data.y
 
 istate = wave_simulation.store.store[end];
-p1 = plt.heatmap(gn.x / 1e3, gn.y / 1e3, transpose(istate[:, :, 3]))
+# p1 = plt.heatmap(xx / 1e3, yy / 1e3, transpose(istate[:, :, 3]))
 
+x1 = xx[1, :] ./ 1e3
+y1 = yy[:, 1] ./ 1e3
+p1 = plt.heatmap( transpose(istate[:, :, 3]))
+# display(p1)
+
+# p1 =plt.contour(xx / 1e3, yy / 1e3, transpose(istate[:, :, 3]))
+
+# display(p1)
+
+# %%

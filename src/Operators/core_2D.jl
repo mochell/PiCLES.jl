@@ -18,6 +18,7 @@ export InitParticleValues
 
 #include("../Utils/FetchRelations.jl")
 using ...FetchRelations
+using ...ParticleSystems: ForcingData
 
 using ...Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance, StateTypeL1
 using ...Architectures: AbstractGridStatistics, AbstractODEIntegrator
@@ -154,19 +155,20 @@ end
 
 ###### seed particles #####
 """
-InitParticleInstance(model::WaveGrowth1D, z_initials, pars, ij, boundary_flag, particle_on ; cbSets=nothing)
+InitParticleInstance(model::WaveGrowth1D, z_initials, ODE_settings, ij_forcing, ij, xy, boundary_flag, particle_on ; cbSets=nothing)
 wrapper function to initalize a particle instance
         inputs:
         model           is an initlized ODESytem
         z_initials      is the initial state of the ODESystem
-        pars            are the parameters of the ODESystem
+        ODE_settings    are the settings for the ODEIntegrator
+        ij_forcing     is the multstruct with the forcing data, so these the values that will be used in the forcing function of the ODEIntegrator, and will be updated at each step if the forcing is not `nothing` 
         ij              is the (i,j) tuple that of the particle position
         xy              is the (x,y) tuple that of the particle position
         boundary_flag   is a boolean that indicates if the particle is on the boundary
         particle_on     is a boolean that indicates if the particle is on
         chSet           (optional) is the set of callbacks the ODE can have
 """
-function InitParticleInstance(model, z_initials, ODE_settings, ij, xy , boundary_flag, particle_on; cbSets=Nothing)
+function InitParticleInstance(model, z_initials, ODE_settings, ij_forcing, ij, xy, boundary_flag, particle_on; cbSets=Nothing)
 
         ## to do's for add the Projection:
         ## replace boundary_flag with mask that discrimiated by types [0,1,2,3]
@@ -180,6 +182,7 @@ function InitParticleInstance(model, z_initials, ODE_settings, ij, xy , boundary
         z_initials = initParticleDefaults(z_initials)
 
         integrator = ODEIntegrator(model, z_initials, 0.0, ODE_parameters;
+                forcing=ij_forcing,
                 dt=ODE_settings.dt,
                 reltol=ODE_settings.reltol,
                 abstol=ODE_settings.reltol,
@@ -441,7 +444,7 @@ end
 """
         function SeedParticle(State::StateTypeL1, ij:: (Int64, Int64)
         particle_system::Any, particle_defaults::Union{ParticleDefaults,Nothing}, ODE_settings,
-        ij_mesh, ij_wind_tuple, DT:: Float64, boundary::Vector{Int}, periodic_boundary::Bool)
+        ij_mesh, ij_forcing::ForcingData, DT:: Float64, boundary::Vector{Int}, periodic_boundary::Bool)
 
         returns ParicleInstance that can be pushed to ParticleColletion
 """
@@ -458,7 +461,7 @@ function SeedParticle(
         PropagationCorrection::Function,
 
         ij_mesh::NamedTuple, # local grid information
-        ij_wind::Tuple,     # interp winds
+        ij_forcing::ForcingData,
         
         DT::Float64,
         boundary::Vector{T}, periodic_boundary::Bool) where 
@@ -473,7 +476,11 @@ function SeedParticle(
 
         # define initial condition
         # particle initial condition is always (0,0) in relative coordinates not xy anymore
-        z_i, particle_on = InitParticleValues(particle_defaults, (0.0, 0.0) , ij_wind, DT)
+        z_i, particle_on = InitParticleValues(
+                particle_defaults,
+                (0.0, 0.0),
+                (ij_forcing.u_wind, ij_forcing.v_wind),
+                DT)
 
         # check if point is boundary point <-- replace in the future with with mask: 0 = land, 1 = ocean, 2= land boundary, 3 = domain boundary
         # boundary_point = check_boundary_point(ij, boundary, periodic_boundary) # old version that compares to list 
@@ -494,6 +501,7 @@ function SeedParticle(
                 particle_system,
                 z_i,
                 ODE_settings,
+                ij_forcing,
                 ij,
                 xy,
                 boundary_point,

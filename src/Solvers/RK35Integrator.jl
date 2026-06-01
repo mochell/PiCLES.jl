@@ -9,11 +9,13 @@ using ...Architectures: AbstractODEIntegrator
 # RHS signature: model!(du, u, params, t)
 # ------------------------------------------------------------
 
-mutable struct ODEIntegrator{F,T,Z<:AbstractVector,P} <: AbstractODEIntegrator
+mutable struct ODEIntegrator{F,T,Z<:AbstractVector,P,FD} <: AbstractODEIntegrator
     model!::F
     u::Z
     t::T
+    
     params::P
+    forcing::FD
 
     # adaptive control
     dt::T
@@ -38,16 +40,16 @@ mutable struct ODEIntegrator{F,T,Z<:AbstractVector,P} <: AbstractODEIntegrator
 end
 
 """
-    ODEIntegrator(model!, u0, t0, params=nothing; kwargs...)
+    ODEIntegrator(model!, u0, t0, params=nothing; forcing=nothing, kwargs...)
 
 Create an RK3(2) Bogacki–Shampine integrator (adaptive internal dt), in-place RHS:
 
-    model!(du, u, params, t)
+    model!(du, u, params, t, forcing)
 
 `u0` must be an AbstractVector.
 """
 function ODEIntegrator(model!::F, u0::AbstractVector, t0::Real, params=nothing;
-    dt=1e-2, reltol=1e-6, abstol=1e-9,
+    forcing=nothing, dt=1e-2, reltol=1e-6, abstol=1e-9,
     dtmin=1e-12, dtmax=1.0, safety=0.9) where {F}
     u = copy(u0)
     Tt = float(t0)
@@ -61,8 +63,8 @@ function ODEIntegrator(model!::F, u0::AbstractVector, t0::Real, params=nothing;
     sc = similar(u)
     err = similar(u)
 
-    return ODEIntegrator{F,typeof(Tt),typeof(u),typeof(params)}(
-        model!, u, Tt, params,
+    return ODEIntegrator{F,typeof(Tt),typeof(u),typeof(params),typeof(forcing)}(
+        model!, u, Tt, params, forcing,
         float(dt), float(reltol), float(abstol), float(dtmin), float(dtmax), float(safety),
         k1, k2, k3, k4, tmp, unew, sc, err,
         false
@@ -94,6 +96,7 @@ function _rk35_attempt!(integ::ODEIntegrator, dt::Real)
     u = integ.u
     t = integ.t
     p = integ.params
+    f = integ.forcing
 
     k1 = integ.k1
     k2 = integ.k2
@@ -107,22 +110,22 @@ function _rk35_attempt!(integ::ODEIntegrator, dt::Real)
 
     # k1 = f(u,t) (FSAL reuse if available)
     if !integ.has_fsal
-        model!(k1, u, p, t)
+        model!(k1, u, p, f, t)
     end
 
     # tmp = u + dt/2 * k1
     @. tmp = u + (dtT / 2) * k1
-    model!(k2, tmp, p, t + dtT / 2)
+    model!(k2, tmp, p, f, t + dtT / 2)
 
     # tmp = u + 3dt/4 * k2
     @. tmp = u + (3dtT / 4) * k2
-    model!(k3, tmp, p, t + 3dtT / 4)
+    model!(k3, tmp, p, f, t + 3dtT / 4)
 
     # 3rd-order solution
     @. un = u + dtT * ((2 / 9) * k1 + (1 / 3) * k2 + (4 / 9) * k3)
 
     # FSAL evaluation at end of step
-    model!(k4, un, p, t + dtT)
+    model!(k4, un, p, f, t + dtT)
 
     # embedded 2nd-order solution error (u3 - u2)
     @. err = un - (u + dtT * ((7 / 24) * k1 + (1 / 4) * k2 + (1 / 3) * k3 + (1 / 8) * k4))
@@ -189,10 +192,23 @@ function step!(integ::ODEIntegrator, DT::Real, a::Bool; maxiters::Int=10^4)
 end
 
 
+function update_forcing!(integ::ODEIntegrator, forcing)
+    # there must be a better way of doing this without hardcoding the indices of u for position, but for now this is fine
+    integ.forcing.u_wind = forcing.u_wind(integ.u[4], integ.u[5], integ.t)
+    integ.forcing.v_wind = forcing.v_wind(integ.u[4], integ.u[5], integ.t)
+end
+
+
+
 """
-    solve!(integ, t_end; saveat=nothing, save=true, maxiters=10^7)
+    solve!(integ, t_end; forcing=nothing, saveat=nothing, save=true, maxiters=10^7)
 
 Integrate forward until `t_end`.
+
+Solve!() is not used in PICLES intergration, but step!() is used instead. solve!() is just a convenient tester and wrapper around step!() for doing longer integrations with optional saving of the trajectory, and is not designed to be called at every step of the integration.
+
+forcing: if not `nothing`, should be a struct with fields `u_wind` and `v_wind` that are functions of (x,y,t) and will be evaluated at the local integration time and position (time in sec since birth, position in local refercence frame potentially) at each step.
+        if forcing is `nothing`, then the forcing in the integrator will not be updated during integration, and should be set to the desired value before calling `solve!`.
 
 Saving behavior (when `save=true`):
 - `saveat === nothing`: saves every accepted internal step (variable spacing).
@@ -206,7 +222,7 @@ Returns:
 - if `save=true`: `(ts::Vector{Float64}, us::Vector{Vector})`
 - if `save=false`: `(t_final::Float64, u_final::Vector)`
 """
-function solve!(integ::ODEIntegrator, t_end::Real; saveat=nothing, save::Bool=true, maxiters::Int=10^7)
+function solve!(integ::ODEIntegrator, t_end::Real; forcing=nothing, saveat=nothing, save::Bool=true, maxiters::Int=10^7)
     t_end = float(t_end)
     t_end < integ.t && error("t_end=$(t_end) is behind current time t=$(integ.t)")
 
@@ -261,6 +277,11 @@ function solve!(integ::ODEIntegrator, t_end::Real; saveat=nothing, save::Bool=tr
         dt_out <= 0 && error("saveat interval must be > 0")
 
         while integ.t < t_end
+            if forcing !== nothing
+                # this is the forcing at the local(!) integration time and position (time in sec, position in local refercence frame potentially)
+                # for PICLES integration use step! rather then sovle!
+                update_forcing!(integ, forcing)
+            end
             dt = min(dt_out, t_end - integ.t)
             step!(integ, dt; maxiters=maxiters)
             push!(ts, float(integ.t))
@@ -278,11 +299,17 @@ function solve!(integ::ODEIntegrator, t_end::Real; saveat=nothing, save::Bool=tr
             if toutf > t_end
                 break
             end
+            if forcing !== nothing
+                update_forcing!(integ, forcing)
+            end
             step!(integ, toutf - integ.t; maxiters=maxiters)
             push!(ts, float(integ.t))
             push!(us, copy(integ.u))
         end
         if integ.t < t_end
+            if forcing !== nothing
+                update_forcing!(integ, forcing)
+            end
             step!(integ, t_end - integ.t; maxiters=maxiters)
             push!(ts, float(integ.t))
             push!(us, copy(integ.u))

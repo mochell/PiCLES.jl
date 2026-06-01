@@ -1,4 +1,4 @@
-ENV["JULIA_INCREMENTAL_COMPILE"]=true
+#ENV["JULIA_INCREMENTAL_COMPILE"]=true
 using Pkg
 Pkg.activate("PiCLES/")
 import Plots as plt

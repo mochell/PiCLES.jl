@@ -1,6 +1,10 @@
 using Pkg
 Pkg.activate("PiCLES/")
 
+"""
+This test is to check the behavior of a single particle in a 2D domain with winds being updated every outer integration timestep DT. This requires the change of the description of the wind forcing inputs in the particle equations (likely _v6).
+"""
+
 ##using OrdinaryDiffEq
 using Plots
 using Setfield
@@ -9,7 +13,7 @@ using IfElse
 # include("../src/ParticleSystems/particle_waves_v5.jl")
 
 using PiCLES
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 using PiCLES.Utils: Init_Standard
 
 import PiCLES: FetchRelations, ParticleTools
@@ -19,7 +23,10 @@ using Oceananigans.Units
 plot_path_base = "plots/tests/T04_2D_single_particle/"
 mkpath(plot_path_base)
 
+using Revise
+
 # %%
+
 Revise.retry()
 u(x::Number, y::Number, t::Number) = (5.0 * cos(t / (3 * 60 * 60 * 2π)) + 0.1) + x * 0 + y * 0
 v(x::Number, y::Number, t::Number) = -(5.0 * sin(t / (3 * 60 * 60 * 2π)) + 0.1) + x * 0 + y * 0
@@ -28,9 +35,9 @@ v(x::Number, y::Number, t::Number) = -(5.0 * sin(t / (3 * 60 * 60 * 2π)) + 0.1)
 # v(x::Number, y::Number, t::Number) = 6.0 + x * 0 + y * 0 + t * 0
 
 
-DT = 6hours
+DT = 2hours
 ParticleState, default_ODE_parameters, WindSeamin, Const_ID = Init_Standard(u(0.0, 0.0, 0.0), v(0.0, 0.0, 0.0), DT)
-particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q)
+particle_system = PW.particle_equations(γ=Const_ID.γ, q=Const_ID.q)
 
 # define simple callback
 # condition(u, t, integrator) = 0.9 * u[1] > log(17)
@@ -83,7 +90,11 @@ using PiCLES.Operators.core_2D: initParticleDefaults
 z_initials = initParticleDefaults(ParticleState)
 t0 = 0.0
 
+Forcing = PW.ForcingData(u_wind=u(0.0, 0.0, 0.0), v_wind=v(0.0, 0.0, 0.0))
+@info Forcing
+
 integ1 = ODEIntegrator(particle_system, z_initials, 0.0, ODE_settings.Parameters;
+    forcing=Forcing,
     dt=ODE_settings.dt,
     reltol=ODE_settings.reltol,
     abstol=ODE_settings.abstol,
@@ -91,7 +102,12 @@ integ1 = ODEIntegrator(particle_system, z_initials, 0.0, ODE_settings.Parameters
     dtmax=ODE_settings.dtmax)
 
 
-ts1, zs1 = solve!(integ1, ODE_settings.timestep; saveat=ODE_settings.saving_step)
+Fcollection = PiCLES.custom_structures.ForcingCollection(u_wind=u, v_wind=v)
+
+@info Fcollection
+
+ts1, zs1 = solve!(integ1, ODE_settings.timestep*3; forcing=Fcollection, saveat=ODE_settings.saving_step)
+
 
 
 # %%
@@ -120,20 +136,19 @@ plot!(p2, [0, 0], [-axlim, axlim], color=:black, linewidth=1, label=nothing)
 plot!(p2, [-axlim, axlim], [0, 0], color=:black, linewidth=1, label=nothing)
 
 
-
 #quiver!(p2, [0], [0], quiver=( [u.(0, 0, 0)], [v.(0, 0, 0)]), color=:red, linewidth=2, scale_units=:data, label="wind")
 
 # position
 p3 = plot(PID[tsub, 4] / 1e3, PID[tsub, 5] / 1e3, marker=3, title="position", ylabel="postition", label="v4") #|> display
 
-tsubx = range(start=1, stop=length(PID[:, 1]), step=20)
-time_sub = ts1[tsubx] / (60 * 60)
+tsubx = range(start=1, stop=length(PID[:, 1]), step=100)
+time_sub = ts1[tsubx] #/ (60 * 60)
 #plot quivers every qstep2
 
 quiver!(p3, PID[tsubx, 4] / 1e3, PID[tsubx, 5] / 1e3, quiver=(u.(0, 0, time_sub) / 1, v.(0, 0, time_sub) / 1), color=:red, linewidth=2)#, label="wind")
 
 
-axlim = 200#1300
+axlim = 400#1300
 plot!(p3, xlims=(-axlim, axlim), ylims=(-axlim, axlim))
 plot!(p3, [0, 0], [-axlim, axlim], color=:black, linewidth=1, label=nothing)
 plot!(p3, [-axlim, axlim], [0, 0], color=:black, linewidth=1, label=nothing)
@@ -145,14 +160,16 @@ plot(p1, p2, p3, p4, layout=(2, 2), legend=true, size=(800, 800))
 # subtitle = "u$(U10)_v$(V10)_reset_to_windsea_dt$(DT)"
 # savefig(joinpath(plot_path_base, subtitle * "_continous_foreward.png"))
 
-
-
-
 # %%
+
+"""
+----------- InitParticleInstance is updated acoording to the new forcing definitions
+"""
 Revise.retry()
-PI = InitParticleInstance(particle_system, ParticleState, ODE_settings, (0, 0), (1, 2), false, true)
+PI = InitParticleInstance(particle_system, ParticleState, ODE_settings, Forcing, (0, 0), (1, 2), false, true)
 PI.ODEIntegrator
-PI.ODEIntegrator.u
+
+@info PI.ODEIntegrator.forcing
 
 function set_u_and_t!(integrator, u_new, t_new)
     integrator.u = u_new
@@ -164,7 +181,7 @@ function time_step_local!(PI, DT)
 
     #@info "proposed dt", get_proposed_dt(PI.ODEIntegrator) / 60
     # step!(PI.ODEIntegrator, DT, true)
-    ts, us = solve!(PI.ODEIntegrator, DT; save=true, saveat=60, maxiters=10^7)
+    ts, us = solve!(PI.ODEIntegrator, DT; forcing=Fcollection, save=true, saveat=60, maxiters=10^7)
 
     #@info "u:", PI.ODEIntegrator.u
     #clock_time += DT
@@ -193,7 +210,7 @@ function time_step_local!(PI, DT)
     return ts, us
 end
 
-# ts, us = time_step_local!(PI, DT/10)
+#ts, us = time_step_local!(PI, DT/10)
 # PI.ODEIntegrator.dt
 # PI.ODEIntegrator.u
 # PI.ODEIntegrator.t
@@ -239,7 +256,7 @@ for i in range(1, 8)
 
     # subtitle = "u$(U10)_v$(V10)_reset_to_windsea_dt$(DT)"
     # savefig(joinpath(plot_path_base, subtitle * "_continous_foreward.png"))
-    # display(plot(p1, p2, p3, p4, layout=(2, 2), legend=true, size=(1200, 1200)))
+    display(plot(p1, p2, p3, p4, layout=(2, 2), legend=true, size=(1200, 1200)))
 
 end
 

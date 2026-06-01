@@ -6,11 +6,13 @@ import Oceananigans: fields
 using Oceananigans.Units
 
 using ..Architectures: AbstractStore, AbstractDiagnostic, AbstractOutputWriter
+using ..custom_structures: ForcingCollection
 
 #using PiCLES.Architectures: StateOrNothing, StateStore, AbstractStore, EmptyStore
 
-mutable struct Simulation{ML, TS, DT, ST, DI, OW, CB}
+mutable struct Simulation{ML, FC, TS, DT, ST, DI, OW, CB}
                 model            :: ML
+                forcing          :: FC
                 timestepper      :: TS
                 Δt               :: DT
                 stop_iteration   :: Float64
@@ -50,6 +52,7 @@ for constant time steps or a `TimeStepWizard` for adaptive time-stepping.
         seconds of wall clock time.
 """
 function Simulation(model; Δt,
+        forcing=nothing,
         verbose = true,
         stop_iteration = Inf,
         stop_time = Inf,
@@ -81,7 +84,13 @@ function Simulation(model; Δt,
 
         store = EmptyStore(1)
 
+        if forcing === nothing && hasproperty(model, :winds)
+                winds = getproperty(model, :winds)
+                forcing = winds === nothing ? nothing : ForcingCollection(u_wind=winds.u, v_wind=winds.v)
+        end
+
         return Simulation(model,
+                        forcing,
                         model.timestepper,
                         Δt,
                         Float64(stop_iteration),
