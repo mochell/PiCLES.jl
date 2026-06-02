@@ -341,7 +341,7 @@ function init_movie_2D_rectangle(wave_simulation; resolution=(900, 1200), name_s
     #scatter!(ax_wind, vec(gridmesh.* 1e-3), rotations=0, markersize=20, marker='↑')
 
 
-    hm_o = heatmap!(ax_o, 1e-3 * xx, 1e-3 * yy, wave_energy, colormap=:dense, colorrange=(0, 12))
+    hm_o = heatmap!(ax_o, 1e-3 * xx, 1e-3 * yy, wave_energy, colormap=:dense, colorrange=(0, 16))
     hm_x = heatmap!(ax_mx, 1e-3 * xx, 1e-3 * yy, wave_momentum_x, colormap=:balance, colorrange=(-0.1, 0.1))
     hm_y = heatmap!(ax_my, 1e-3 * xx, 1e-3 * yy, wave_momentum_y, colormap=:balance, colorrange=(-0.1, 0.1))
 
@@ -359,8 +359,11 @@ function init_movie_2D_rectangle(wave_simulation; resolution=(900, 1200), name_s
     Colorbar(fig[2, 3], hm_x, label="Wave momentum x []")
     Colorbar(fig[3, 3], hm_cx, label="Group Velocity [m/s]")
 
-    wind_lim = 200
+    wind_lim = 600
     limits!(ax_wind, (-wind_lim, wind_lim), (-wind_lim, wind_lim))
+
+    hs_lim = 2000
+    limits!(ax_o, (-hs_lim, hs_lim), (-hs_lim, hs_lim))
 
     for ax in (ax_wind, ax_o, ax_mx, ax_my, ax_cx, ax_cy)
         vlines!(ax, axline, color=:black)

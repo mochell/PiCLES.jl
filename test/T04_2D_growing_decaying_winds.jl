@@ -44,9 +44,7 @@ ODEpars, Const_ID, Const_Scg = PW.ODEParameters(r_g=0.85)
 
 
 # define grid
-grid = TwoDGrid(260e3, 66, 80e3, 21)
-mesh = TwoDGridMesh(grid, skip=1);
-gn = TwoDGridNotes(grid);
+grid = TwoDCartesianGridMesh(260e3, 66, 80e3, 21; periodic_boundary=(false, true))
 
 # example user function
 u_func(x, y, t) = U10 + x * 0 + y * 0 + t * 0
@@ -70,19 +68,15 @@ default_particle = ParticleDefaults(WindSeamin["lne"], WindSeamin["cg_bar_x"], W
 ODE_settings = PW.ODESettings(
     Parameters=ODEpars,
     # define mininum energy threshold
-    log_energy_minimum=WindSeamin["lne"],
+    log_energy_minimum=lne_local,#log(FetchRelations.Eⱼ(0.1, DT)),
     #maximum energy threshold
     log_energy_maximum=log(27),#log(17),  # correcsponds to Hs about 16 m
-    saving_step=DT,
+    saving_step=6000,
     timestep=DT,
-    total_time=T = 6days,
-    adaptive=true,
-    dt=1e-3, #60*10, 
-    dtmin=1e-4, #60*5, 
-    force_dtmin=true,
-    callbacks=nothing,
-    save_everystep=false)
-
+    total_time=T = 12days,
+    dt=1e-3,
+    dtmin=1e-4,
+    dtmax=20minutes)
 
 # %%
 
