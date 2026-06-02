@@ -4,7 +4,7 @@ ENV["JULIA_INCREMENTAL_COMPILE"] = true
 using Pkg
 Pkg.activate("PiCLES/")
 
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 using PiCLES.ParticleSystems: particle_waves_fake as PW_fake
 
 
@@ -134,14 +134,19 @@ p = Plots.contourf(grid_model.data.x[:, 2], grid_model.data.y[2, :], transpose(u
 display(p)
 # %%
 
-function plot_particle_collection(wave_model)
+function plot_particle_collection(wave_model; forcing=nothing)
     particles = wave_model.ParticleCollection
     p = plot(layout=(3, 2), size=(1200, 1200))
     heatmap!(p, transpose(particles.on), subplot=1, title="on | iter=" * string(wave_model.clock.iteration) * " | time=" * string(round(wave_model.clock.time / 60 / 60)) * "hours")
 
     xi, yi = wave_model.grid.data.x, wave_model.grid.data.y
-    ui = wave_model.winds.u.(xi, yi, wave_model.clock.time)
-    vi = wave_model.winds.v.(xi, yi, wave_model.clock.time)
+    if isnothing(forcing)
+        ui = wave_model.winds.u.(xi, yi, wave_model.clock.time)
+        vi = wave_model.winds.v.(xi, yi, wave_model.clock.time)
+    else
+        ui = forcing.u_wind.(xi, yi, wave_model.clock.time)
+        vi = forcing.v_wind.(xi, yi, wave_model.clock.time)
+    end
     xt_idx = 1:50:size(xi, 1)
     yt_idx = 1:50:size(yi, 2)
     xt_lbl = Int.(round.(xi[xt_idx, 1]; digits=0))
@@ -191,7 +196,7 @@ end
 
 # %%
 Revise.retry()
-particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q,
+particle_system = PW.particle_equations(γ=Const_ID.γ, q=Const_ID.q,
     propagation=true,
     input=true,
     dissipation=true,
@@ -223,11 +228,13 @@ ODE_settings = PW.ODESettings(
     dtmin=1e-4,
     dtmax=20minutes)
 
-
+# build forcing object
 Revise.retry()
 
+forcing = PiCLES.custom_structures.ForcingCollection(u_wind=u, v_wind=v)
+
 wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid_model,
-    winds=winds,
+    winds=nothing,
     ODEsys=particle_system,
     ODEsets=ODE_settings,  # ODE_settings
     #ODEinit_type=ParticleDefaults(default_windsea[1], default_windsea[2], default_windsea[3], 0.0, 0.0),
@@ -239,14 +246,14 @@ wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid_model,
     movie=true)
 
 # %% build Simulation
-T_int = 48hours*2
-wave_simulation = Simulation(wave_model, Δt=DT, stop_time=T_int)
+T_int = 3hours*1
+wave_simulation = Simulation(wave_model, Δt=DT, stop_time=T_int, forcing=forcing)
 initialize_simulation!(wave_simulation)
-plot_particle_collection(wave_model)
+plot_particle_collection(wave_model, forcing=wave_simulation.forcing)
 
-run!(wave_simulation, cash_store=true, debug=false);
+#run!(wave_simulation, cash_store=true, debug=false);
 
-plot_particle_collection(wave_model)
+#plot_particle_collection(wave_model, forcing=wave_simulation.forcing)
 
 # %%
 
@@ -264,7 +271,7 @@ Plots.plot!(p, grid_data.data.y[Ni_data, :], u.(grid_data.data.x[Ni_data, :], gr
 
 # wind in model 
 Ni_model = 46
-Plots.plot!(p, grid_model.data.y[Ni_model, :], wave_model.winds.u.(grid_model.data.x[Ni_model, :], grid_model.data.y[Ni_model, :], time_sel),
+Plots.plot!(p, grid_model.data.y[Ni_model, :], wave_simulation.forcing.u_wind.(grid_model.data.x[Ni_model, :], grid_model.data.y[Ni_model, :], time_sel),
             label="u on M grid at t=" * string(time_sel) * " sec")
 #Plots.plot!(p, wave_model.winds.u.(grid_model.data.x[46, :], grid_model.data.y[46, :], time_rel[end]))
 
@@ -283,19 +290,14 @@ label="log(E) on M grid at t=" * string(time_sel) * " sec")
 
 display(p)
 
-# %%
-
-Plots.heatmap(u.(grid_data.data.x[46, :], grid_data.data.y[46, :], time_sel))
-
-
 
 
 # %% manual testing
 for i in 1:1:300
-    TimeSteppers.time_step!(wave_simulation.model, wave_simulation.Δt)
+    TimeSteppers.time_step!(wave_simulation.model, wave_simulation.Δt; forcing=wave_simulation.forcing)
 
     if i % 5 == 0
-        plot_particle_collection(wave_simulation.model)
+        plot_particle_collection(wave_simulation.model, forcing=wave_simulation.forcing)
         # fig = PlotState_DoubleGlobeSeam(wave_simulation.model, scaled=false)
         # fig
         sleep(0.2)
@@ -333,11 +335,11 @@ using PiCLES.Operators.core_2D: GetGroupVelocity
 using PiCLES.Plotting.movie: init_movie_2D_simple
 
 # or, alternatively, make movie
-save_path = "plots/hurricanes/TC_Lee/"
-plot_name = "moving_box_test_run"
+save_path = "plots/tests/"
+plot_name = "T03_sphere_moving_box"
 # N = 100
 # N = Int(time_rel[end] / DT / 2)
-N = Ntime
+N = wind_attrs.Ntime*4
 
 fig, n = init_movie_2D_simple(wave_simulation; resolution=(1350, 1200), name_string=plot_name, aspect=1)
 
@@ -350,7 +352,7 @@ record(fig, save_path * plot_name * ".gif", 1:N, framerate=10) do i
     # wave_simulation.model.State .= 0.0
     # TimeSteppers.time_step!(wave_simulation.model, wave_simulation.Δt)
     # wave_simulation.model.State .= 0.0
-    TimeSteppers.movie_time_step!(wave_simulation.model, wave_simulation.Δt)
+    TimeSteppers.movie_time_step!(wave_simulation.model, wave_simulation.Δt; forcing=wave_simulation.forcing)
     # Set the current index or iteration counter to 1, likely initializing or resetting
     # a variable that tracks the frame number, time step, or current position in a sequence
     n[] = 1
@@ -359,6 +361,5 @@ end
 wave_simulation.model.clock.time / (60 * 60 * 24) # hours
 
 
-Ntime * DT / (60 * 60 * 24) # hours
 
 # %%

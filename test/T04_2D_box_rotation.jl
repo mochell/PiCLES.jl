@@ -51,9 +51,9 @@ ODEpars, Const_ID, Const_Scg = PW.ODEParameters(r_g=0.85)
 
 # u(x, y, t) = 0.01 + U10 * sin(t / (6 * 60 * 60 * 2π)) * sin(x / 50e3) * sin(y / 50e3)
 # v(x, y, t) = 0.01 - V10 * cos(t / (6*60*60 * 2π) ) * sin(x / 50e3) * sin(y / 50e3)
-u_std= 20e3 *1
-v_std= 20e3 *1
-center = 25e3
+u_std= 15e3 *1
+v_std= 15e3 *1
+center = 30e3
 u_func(x, y, t) = U10 * exp(-(x - center)^2 / u_std^2) * exp(-(y - center)^2 / v_std^2) * cos(t * 1.2 / (1 * 60 * 60 * 2π))
 v_func(x, y, t) = V10 * exp(-(x - center)^2 / u_std^2) * exp(-(y - center)^2 / v_std^2) * sin(t * 1.2 / (1 * 60 * 60 * 2π))
 
@@ -103,15 +103,19 @@ default_particle = ParticleDefaults(lne_local, WindSeamin["cg_bar_x"], WindSeami
 ODE_settings = PW.ODESettings(
     Parameters=ODEpars,
     # define mininum energy threshold
-    log_energy_minimum=lne_local,#log(FetchRelations.Eⱼ(0.1, DT)),
+    log_energy_minimum=lne_local /100,#log(FetchRelations.Eⱼ(0.1, DT)),
     #maximum energy threshold
     log_energy_maximum=log(27),#log(17),  # correcsponds to Hs about 16 m
+    wind_min_squared = 1.0, # 4.0 is default
     saving_step=dt_ODE_save,
     timestep=DT,
     total_time=T = 12days,
     dt=1e-3, #60*10, 
     dtmin=1e-4, #60*5, 
     dtmax=20minutes)
+
+
+ODE_settings.wind_min_squared
 
 
 # %%
@@ -124,9 +128,10 @@ wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
     periodic_boundary=false,
     boundary_type="same",
     # minimal_particle=FetchRelations.MinimalParticle(U10, V10, DT), #
-    # minimal_state=FetchRelations.MinimalState(2, 2, DT) * 1,
+    minimal_state=FetchRelations.MinimalState(0.5, 0.5, DT) / 10,
     movie=true)
 
+@info wave_model.minimal_state
 
 wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=24hours, forcing=forcing)#1hours)
 initialize_simulation!(wave_simulation)

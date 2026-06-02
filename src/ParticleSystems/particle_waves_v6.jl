@@ -53,7 +53,7 @@ $(DocStringExtensions.FIELDS)
     sea_ice_thickness::Union{Float64,Nothing} = nothing
 end
 
-function Base.show(io::IO, ow::ForcingData)
+function Base.show(io::IO, ::MIME"text/plain", ow::ForcingData)
     lines = String[]
     push!(lines, "ForcingData")
     

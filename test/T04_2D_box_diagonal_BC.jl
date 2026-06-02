@@ -8,7 +8,7 @@ Pkg.activate("PiCLES/")
 import Plots as plt
 using Setfield, IfElse
 
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 
 import PiCLES: FetchRelations, ParticleTools
 using PiCLES.Operators.core_2D: ParticleDefaults, InitParticleInstance, GetGroupVelocity
@@ -88,9 +88,9 @@ typeof(winds.u(1e3, 1e3, 11))
 # typeof(winds.u(x, y, t))
 # %%
 
-grid = TwoDGrid(100e3, 51, 100e3, 51)
-mesh = TwoDGridMesh(grid, skip=1);
-gn = TwoDGridNotes(grid);
+grid = PiCLES.Grids.CartesianGrid.TwoDCartesianGridMesh(100e3, 51, 100e3, 51)
+mesh = grid.data
+gn = (x=grid.data.x[:, 1], y=grid.data.y[1, :])
 
 #heatmap( v.(mesh.x, mesh.y, 0) )
 
@@ -101,7 +101,7 @@ Revise.retry()
 
 #ProfileView.@profview 
 #ProfileView.@profview 
-particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q, input=true, dissipation=true);
+particle_system = PW.particle_equations(γ=Const_ID.γ, q=Const_ID.q, input=true, dissipation=true);
 #particle_equations = PW3.particle_equations_vec5(u, v, u, v, γ=Const_ID.γ, q=Const_ID.q);
 
 # define V4 parameters absed on Const NamedTuple:
@@ -125,12 +125,9 @@ ODE_settings = PW.ODESettings(
     saving_step=dt_ODE_save,
     timestep=DT,
     total_time=T = 6days,
-    adaptive=true,
     dt=1e-3, #60*10, 
     dtmin=1e-4, #60*5, 
-    force_dtmin=true,
-    callbacks=nothing,
-    save_everystep=false)
+    dtmax=20minutes)
 
 
 default_particle = ParticleDefaults(lne_local, cg_u_local, cg_v_local, 0.0, 0.0)

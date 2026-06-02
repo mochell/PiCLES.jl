@@ -123,7 +123,7 @@ function IDConstants(; r_g=0.85, c_D=2e-3, c_β=4e-2, c_e=1.3e-6, c_alpha=11.8, 
 end
 
 
-function Base.show(io::IO, ow::IDConstantsInstance)
+function Base.show(io::IO, ::MIME"text/plain", ow::IDConstantsInstance)
 
     print(io, "IDConstants ", "\n",
         "├── c_D: ", ow.c_D, "\n",
@@ -157,7 +157,7 @@ function ScgConstants(; C_alpha=-1.41, C_varphi=1.81e-5)
 end
 
 
-function Base.show(io::IO, ow::ScgConstantsInstance)
+function Base.show(io::IO, ::MIME"text/plain", ow::ScgConstantsInstance)
 
     print(io, "ScgConstants ", "\n",
         "├── C_alpha: ", ow.C_alpha, "\n",
