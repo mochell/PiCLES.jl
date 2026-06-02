@@ -370,7 +370,7 @@ function NodeToParticle!(PI::AbstractParticleInstance, S::StateTypeL1,
 
                 #@show PI.ODEIntegrator.t, PI.ODEIntegrator.u
                 
-        elseif ~PI.boundary & (speed_square(wind_tuple[1], wind_tuple[2]) >= wind_min_squared) #minimal windsea is not big enough but local winds are strong enough  #(u_state[1] < exp(e_min_log)) | PI.boundary
+        elseif ~PI.boundary & (speed_square(wind_tuple[1], wind_tuple[2]) >= wind_min_squared) #minimal windsea is too small but local winds are strong enough  #(u_state[1] < exp(e_min_log)) | PI.boundary
                 # test if particle is below energy threshold, or
                 #      if particle is at the boundary
 
