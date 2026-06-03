@@ -1,0 +1,383 @@
+"""
+Manual diagnostic: distributed 2D particle experiments.
+
+Interactive script for multi-process behavior and visualization checks.
+"""
+
+import Plots as plt
+
+using Distributed
+addprocs(3)
+
+@everywhere using DistributedArrays
+
+@everywhere using Setfield, IfElse
+
+@everywhere using PiCLES.ParticleSystems: particle_waves_v5 as PW
+
+using PiCLES.ParticleSystems: particle_waves_v5 as PW
+
+
+@everywhere import PiCLES: FetchRelations, ParticleTools
+@everywhere using PiCLES.Operators.core_2D: ParticleDefaults, InitParticleInstance, GetGroupVelocity
+using PiCLES.Operators: TimeSteppers
+using PiCLES.Simulations
+using PiCLES.Operators.TimeSteppers: time_step!, movie_time_step!
+
+@everywhere using PiCLES.ParticleMesh: TwoDGrid, TwoDGridNotes, TwoDGridMesh
+@everywhere using PiCLES.Models.WaveGrowthModels2D
+
+using Oceananigans.TimeSteppers: Clock, tick!
+import Oceananigans: fields
+@everywhere using Oceananigans.Units
+import Oceananigans.Utils: prettytime
+
+using PiCLES.Architectures
+using GLMakie
+
+using PiCLES.Operators.core_2D: GetGroupVelocity, speed
+using PiCLES.Plotting.movie: init_movie_2D_box_plot
+
+# debugging:
+#using ProfileView
+
+# %%
+save_path = "plots/tests/T04_box_2_BC/"
+mkpath(save_path)
+
+@everywhere begin
+# % Parameters
+U10, V10 = 10.0, 10.0
+dt_ODE_save = 30minutes
+DT = 30minutes
+# version 3
+r_g0 = 0.85
+
+# function to define constants 
+
+
+Const_Scg = PW.get_Scg_constants(C_alpha=-1.41, C_varphi=1.81e-5)
+
+
+u_func(x, y, t) = U10 #* sin(t / (6 * 60 * 60 * 2π)) * sin(x / 50e3) * sin(y / 50e3)
+v_func(x, y, t) = V10 #* cos(t / (6 * 60 * 60 * 2π)) * sin(x / 50e3) * sin(y / 50e3)
+
+u(x, y, t) = u_func(x, y, t)
+v(x, y, t) = v_func(x, y, t)
+winds = (u=u, v=v)
+
+
+
+
+grid = TwoDGrid(100e3, 51, 100e3, 51)
+mesh = TwoDGridMesh(grid, skip=1);
+gn = TwoDGridNotes(grid);
+
+#ProfileView.@profview 
+particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q, input=true, dissipation=true);
+#particle_equations = PW3.particle_equations_vec5(u, v, u, v, γ=Const_ID.γ, q=Const_ID.q);
+
+# define V4 parameters absed on Const NamedTuple:
+default_ODE_parameters = (r_g=r_g0, C_α=Const_Scg.C_alpha,
+    C_φ=Const_ID.c_β, C_e=Const_ID.C_e, g=9.81);
+
+# define setting and standard initial conditions
+WindSeamin = FetchRelations.MinimalWindsea(U10, V10, DT);
+#WindSeamin = FetchRelations.MinimalWindsea(u(0, 0, 0), v(0, 0, 0), DT / 2)
+#WindSeamin = FetchRelations.get_initial_windsea(u(0, 0, 0), v(0, 0, 0), DT/5)
+lne_local, cg_u_local, cg_v_local = log(WindSeamin["E"]), WindSeamin["cg_bar_x"], WindSeamin["cg_bar_y"]
+
+ODE_settings = PW.ODESettings(
+    Parameters=default_ODE_parameters,
+    # define mininum energy threshold
+    log_energy_minimum=lne_local,#log(FetchRelations.Eⱼ(0.1, DT)),
+    #maximum energy threshold
+    log_energy_maximum=log(27),#log(17),  # correcsponds to Hs about 16 m
+    saving_step=dt_ODE_save,
+    timestep=DT,
+    total_time=T = 6days,
+    adaptive=true,
+    dt=1e-3, #60*10, 
+    dtmin=1e-4, #60*5, 
+    force_dtmin=true,
+    callbacks=nothing,
+    save_everystep=false)
+
+
+default_particle = ParticleDefaults(lne_local, cg_u_local, cg_v_local, 0.0, 0.0)
+
+end
+
+# plt.heatmap(gn.x / 1e3, gn.y / 1e3, transpose(u.(mesh.x, mesh.y, 0)))
+# plt.heatmap(gn.x / 1e3, gn.y / 1e3, transpose(v.(mesh.x, mesh.y, 0)))
+# %% build model
+
+
+@everywhere wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
+    winds=winds,
+    ODEsys=particle_system,
+    ODEsets=ODE_settings,  # ODE_settings
+    ODEinit_type="wind_sea",  # default_ODE_parameters
+    periodic_boundary=false,
+    boundary_type="same",
+    #minimal_particle=FetchRelations.MinimalParticle(U10, V10, DT),
+    movie=true)
+
+
+### build Simulation
+#wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=4hours)#1hours)
+wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=6hour)#1hours)
+#initialize_simulation!(wave_simulation)
+
+# %%
+function init_particles_dist!(model::Abstract2DModel; defaults::PP=nothing, verbose::Bool=false, workers::Vector{Int}=nothing) where {PP<:Union{ParticleDefaults,Nothing}}
+    #defaults        = isnothing(defaults) ? model.ODEdev : defaults
+    if verbose
+        @info "seed PiCLES ... \n"
+        @info "defaults is $(defaults)"
+        if defaults isa Dict
+            @info "found particle initials, just replace position "
+        else
+            @info "no particle defaults found, use windsea to seed particles"
+        end
+    end
+
+    gridnotes = TwoDGridNotes(model.grid)
+
+    @everywhere function SeedParticle_dist(I)
+
+        SeedParticle_mapper(f, s, b1, b2, b3, c1, c2, c3, d1, d2) = x -> f(s, x, b1, b2, b3, c1, c2, c3, d1, d2)
+        SeedParticle_i = SeedParticle_mapper(SeedParticle2D,
+            model.State,
+            model.ODEsystem, defaults, model.ODEsettings,
+            gridnotes, model.winds, model.ODEsettings.timestep,
+            model.boundary, model.periodic_boundary)
+        #@time [SeedParticle_i((i, j)) for i in I[1], j in I[2]]
+        [SeedParticle_i((i, j)) for i in I[1], j in I[2]]
+
+    end
+
+    #model.ParticleCollection = nothing
+    return DArray(SeedParticle_dist, (model.grid.Nx, model.grid.Ny), workers)
+    #nothing
+end
+
+
+
+
+init_particles_dist!(wave_model, defaults=default_particle, verbose=true, workers=workers()[1:3])
+
+# %% local testing
+# @everywhere begin
+#     # for local testing
+#     using PiCLES.Operators.core_2D: SeedParticle as SeedParticle2D
+#     model = wave_model
+#     defaults = default_particle
+#     gridnotes = TwoDGridNotes(model.grid)
+# end
+# """
+# SeedParticle_mapper(f, p, s, b1, b2, b3, c1, c2, c3, c4, d1, d2 ) = x -> f( p, s, x, b1, b2, b3, c1, c2, c3, c4, d1, d2 )
+# maps to SeedParticle! function
+# """
+# SeedParticle_mapper(f, s, b1, b2, b3, c1, c2, c3, d1, d2) = x -> f(s, x, b1, b2, b3, c1, c2, c3, d1, d2)
+# SeedParticle_i = SeedParticle_mapper(SeedParticle2D,
+#     model.State,
+#     model.ODEsystem, defaults, model.ODEsettings,
+#     gridnotes, model.winds, model.ODEsettings.timestep,
+#     model.boundary, model.periodic_boundary)
+
+
+# #linear version
+# @time X = [SeedParticle_i( (i, j) ) for i in 1:model.grid.Nx, j in 1:model.grid.Ny];
+
+
+# ### distribute:
+# @everywhere function SeedParticle_dist(I)
+
+#     SeedParticle_mapper(f, s, b1, b2, b3, c1, c2, c3, d1, d2) = x -> f(s, x, b1, b2, b3, c1, c2, c3, d1, d2)
+#     SeedParticle_i = SeedParticle_mapper(SeedParticle2D,
+#         model.State,
+#         model.ODEsystem, defaults, model.ODEsettings,
+#         gridnotes, model.winds, model.ODEsettings.timestep,
+#         model.boundary, model.periodic_boundary)
+#     #@time [SeedParticle_i((i, j)) for i in I[1], j in I[2]]
+#     [SeedParticle_i((i, j)) for i in I[1], j in I[2]]
+
+# end
+
+# worker_sublist = workers()[1:end]
+
+# typeof(worker_sublist)
+
+# @time ParticleCollection = DArray(SeedParticle_dist, (model.grid.Nx, model.grid.Ny), worker_sublist);
+# [@fetchfrom p localindices(ParticleCollection) for p in worker_sublist]
+
+
+
+
+# %%
+#init_state_store!(wave_simulation, save_path)
+#wave_simulation.model.MovieState = wave_simulation.model.State
+
+@time run!(wave_simulation, cash_store=true, debug=true)
+#reset_simulation!(wave_simulation)
+# run simulation
+#ProfileView.@profview run!(wave_simulation, cash_store=true, debug=true)
+
+
+istate = wave_simulation.store.store[end];
+p1 = plt.heatmap(gn.x / 1e3, gn.y / 1e3, istate[:, :, 1])
+
+
+# %%
+# show all Failed particles
+using PiCLES.Utils: ParticleTools
+
+DD = ParticleTools.ParticleToDataframe(wave_simulation.model.FailedCollection)
+
+DD_stats = ParticleTools.ParticleStatsToDataframe(wave_simulation.model.FailedCollection)
+
+#sum(DD_stats.boundary)
+
+function plot_state_and_error_points(wave_simulation, FailedTable)
+    plt.plot()
+
+    p1 = plt.heatmap(gn.x / 1e3, gn.y / 1e3, transpose(wave_simulation.model.State[:, :, 1]))
+
+    for xy in FailedTable.position_xy
+        x = xy[1] / 1e3
+        y = xy[2] / 1e3
+        plt.scatter!((x, y), color="red", label="wind")
+    end
+
+    plt.plot!(legend=:none, title="c_g", ylabel="cg m/s", xlabel="position index x") |> display
+end
+
+plot_state_and_error_points(wave_simulation, DD_stats)
+# %%
+
+## testing single ODES
+PF = wave_simulation.model.FailedCollection[end]
+PF.Particle
+#PF.Particle.ODEIntegrator.u = [-15.441984291167334, 0.006707651986269529, 0.003889144130029894, 4000.0, 2333.3333333333335]
+PF.Particle.ODEIntegrator.u
+PF.Particle.ODEIntegrator.t
+PF.Particle.ODEIntegrator.sol.t
+PF.Particle.ODEIntegrator.sol.u
+PF.Particle.ODEIntegrator.sol.prob.u0
+
+using PiCLES.Operators.core_2D: Get_u_FromShared, GetVariablesAtVertex
+S_state = Get_u_FromShared(PF.Particle, wave_simulation.model.MovieState)
+ui = GetVariablesAtVertex(S_state, PF.Particle.position_xy[1], PF.Particle.position_xy[2])
+
+usel = PF.Particle.ODEIntegrator.sol.prob.u0
+t_sel = PF.Particle.ODEIntegrator.sol.u
+index, weight = PIC.compute_weights_and_index(grid, usel[4], usel[5])
+
+using PiCLES: ParticleInCell as PIC
+index, weight = PIC.compute_weights_and_index(grid, PF.Particle.ODEIntegrator.u[4], PF.Particle.ODEIntegrator.u[5])
+
+
+# try manual solution with the same initial conditions
+#using OrdinaryDiffEq
+
+#PF.Particle.ODEIntegrator.u = ui
+ui2 = copy(PF.Particle.ODEIntegrator.sol.prob.u0)
+reinit!(PF.Particle.ODEIntegrator, ui2, erase_sol=false, reset_dt=false, reinit_cache=true)
+u_modified!(PF.Particle.ODEIntegrator, true)
+#auto_dt_reset!(PF.Particle.ODEIntegrator)
+PF.Particle.ODEIntegrator.t
+# set_t!(PF.Particle.ODEIntegrator, PF.Particle.ODEIntegrator.sol.t[end])
+
+wind_tuple = winds.u(PF.Particle.position_xy[1], PF.Particle.position_xy[2], PF.Particle.ODEIntegrator.t), winds.v(PF.Particle.position_xy[1], PF.Particle.position_xy[2], PF.Particle.ODEIntegrator.t)
+step!(PF.Particle.ODEIntegrator, DT, true)
+PF.Particle.ODEIntegrator.u
+
+
+function set_u_and_t!(integrator, u_new, t_new)
+    integrator.u = u_new
+    integrator.t = t_new
+end
+
+#5min
+DT = 5min#wave_simulation.model.ODEsettings.timestep
+ui2
+set_u_and_t!(PF.Particle.ODEIntegrator, ui2, 0.0)
+auto_dt_reset!(PF.Particle.ODEIntegrator)
+step!(PF.Particle.ODEIntegrator, DT, true)
+PF.Particle.ODEIntegrator.u
+
+#index, weight = PIC.compute_weights_and_index(grid, PF.Particle.ODEIntegrator.u[4], PF.Particle.ODEIntegrator.u[5])
+
+#PF.Particle.ODEIntegrator.sol
+#wave_simulation.model.winds.u()
+
+# %%
+#PF.Particle.boundary
+
+istate = wave_simulation.store.store[end];
+#istate = wave_simulation.store.store[5];
+#wave_simulation.model.ParticleCollection[105]
+
+cg = GetGroupVelocity(istate)
+p1 = plt.heatmap(gn.x / 1e3, gn.y / 1e3, istate[:, :, 1])
+
+# %%
+p1 = plt.heatmap(gn.x / 1e3, gn.y / 1e3, cg.c_x)
+
+# %%
+#pcolormesh in Julia 
+# gn = TwoDGridNotes(grid);
+
+# gridmesh = [(i,j) for i in gn.x, j in gn.y];
+# mesh.x = [i for i in gn.x, j in gn.y];
+# mesh.y = [j for i in gn.x, j in gn.y];
+# mesh.x = mesh.x[1:3:end, 1:3:end];
+# mesh.y = mesh.y[1:3:end, 1:3:end];
+
+# %%
+# %%
+
+p1 = plt.heatmap(gn.x / 1e3, gn.y / 1e3, wave_simulation.model.State[:, :, 2])
+
+# plt.quiver!(p1, mesh.x / 1e3, mesh.y / 1e3, quiver=(wave_simulation.model.State[1:3:end, 1:3:end, 2] * 20, wave_simulation.model.State[1:3:end, 1:3:end, 3] * 20), color=:red, scale_unit=:data, label="wind")
+# # scale_unit options: :width, :height, :x, :y, :xy, :data
+
+plt.contour(p1, gn.x / 1e3, gn.y / 1e3, u.(mesh.x, mesh.y, wave_simulation.model.clock.time), color="white")
+
+# # heatmap(wave_simulation.model.State[:, :, 2])
+# # heatmap(wave_simulation.model.State[:, :, 3])
+
+
+#sqrt( wave_simulation.model.winds.v.(mesh.x, mesh.y, 0.0)^2 + wave_simulation.model.winds.u.(mesh.x, mesh.y, 0.0)^2)
+
+# %%
+wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
+    winds=winds,
+    ODEsys=particle_system,
+    ODEsets=ODE_settings,  # ODE_settings
+    ODEinit_type="wind_sea",  # default_ODE_parameters
+    periodic_boundary=false,
+    boundary_type="same",
+    #minimal_particle=FetchRelations.MinimalParticle(U10, V10, DT),
+    movie=true)
+
+wave_simulation = Simulation(wave_model, Δt=5minutes, stop_time=4hours)#1hours)
+initialize_simulation!(wave_simulation)
+
+#reset_simulation!(wave_simulation, particle_initials=copy(wave_model.ODEdefaults))
+
+fig, n = init_movie_2D_box_plot(wave_simulation, name_string="Rotating Stationary Winds")
+
+#wave_simulation.stop_time += 1hour
+N = 250
+record(fig, save_path * "T02_2D_totating_winds_nonper.gif", 1:N, framerate=10) do i
+    @info "Plotting frame $i of $N..."
+    #@time for _ = 1:10
+    #run!(wave_simulation, store=false)
+    @info wave_simulation.model.clock
+    movie_time_step!(wave_simulation.model, wave_simulation.Δt)
+    #coupled_time_step!(ocean_simulation, ice_simulation)
+    #end
+    n[] = 1
+end

@@ -1,5 +1,6 @@
 
 using ...Architectures: BoundaryType
+using ...custom_structures: N_NonPeriodic
 using Statistics
 
 """
