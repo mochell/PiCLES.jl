@@ -8,7 +8,7 @@ import PiCLES
 
 using PiCLES.Utils: Init_Standard
 using PiCLES.Operators.core_2D: InitParticleInstance
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 using PiCLES.Architectures: AbstractParticleInstance
 
 function check_sum(charges_1d)

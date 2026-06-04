@@ -8,7 +8,7 @@ using PiCLES.Models.WaveGrowthModels2D: WaveGrowth2D
 using PiCLES.Simulations
 using PiCLES.Grids.CartesianGrid: TwoDCartesianGridMesh, ProjetionKernel, TwoDCartesianGridStatistics
 
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 using Oceananigans.Units
 
 # just for simple plotting
