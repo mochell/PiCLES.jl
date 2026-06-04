@@ -1,4 +1,3 @@
-#using PiCLES
 using Test
 
 @testset "PiCLES.jl" begin
