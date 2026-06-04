@@ -5,7 +5,7 @@ using DataFrames
 using ...Architectures: AbstractGrid, AbstractODESettings, AbstractParticleInstance
 using ...custom_structures: MarkedParticleInstance
 
-using ...Operators.core_1D: GetParticleEnergyMomentum
+using ...Operators.core_2D: GetParticleEnergyMomentum
 
 using Plots
 

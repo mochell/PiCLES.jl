@@ -100,7 +100,7 @@ end
 # end
 
 
-function reset_PI_u!(PI::AbstractParticleInstance; ui::CC) where {N,CC<:Union{Vector{Float64},MVector{N,Float64}}}
+function reset_PI_u!(PI::AbstractParticleInstance; ui::CC) where {CC<:AbstractVector{Float64}}
         # this method keeps the correct time for time varying forcing (~may 2023)
         # set_u!(PI.ODEIntegrator, ui)
         # u_modified!(PI.ODEIntegrator, true)

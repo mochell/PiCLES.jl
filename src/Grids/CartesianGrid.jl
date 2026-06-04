@@ -136,8 +136,50 @@ ProjetionKernel(Gi::NamedTuple, stats::CartesianGridStatistics) = ProjetionKerne
 ProjetionKernel(G::TwoDCartesianGridMesh) = ProjetionKernel(G.stats)
 
 
-# %% ADD 1D version here
+# %% 1D version -------------------------------------------------------------
+#
+# A 1D run is realised as a degenerate 2D mesh with a thin, periodic y-extent
+# (Ny ≥ 2 — the PIC interpolation and `dy = dimy/(Ny-1)` both need at least two
+# y-nodes). Combined with a v-wind of 0 and c̄_y seeded to 0, the particle
+# equations keep every y-row identical and c_y ≡ 0, so the whole 2D engine
+# (core_2D / mapping_2D / WaveGrowth2D / time_step!) runs unchanged. `CartesianGridMesh1D`
+# subtypes `CartesianGrid2D` so the engine accepts it transparently; output code
+# dispatches on the concrete type to squeeze the singleton y-dimension.
 
+struct CartesianGridMesh1D <: CartesianGrid2D
+    data::StructArray{<:Any}
+    stats::TwoDCartesianGridStatistics
+    ProjetionKernel::Function
+    PropagationCorrection::Function
+end
+
+"""
+    CartesianGridMesh1D(xmin, xmax, Nx::Int; Ny=3, mask=nothing, angle=0.0, periodic_boundary=true)
+
+Build a 1-spatial-dimension grid on `[xmin, xmax]` with `Nx` points, backed by a thin
+`Ny`-row (default 3) periodic-in-y mesh so the 2D engine can run it directly. The y-axis is
+always periodic; `periodic_boundary` controls the x-axis. `Ny` must be ≥ 2.
+"""
+function CartesianGridMesh1D(xmin, xmax, Nx::Int; Ny::Int=3, mask=nothing, angle=0.0, periodic_boundary::Bool=true)
+    Ny >= 2 || throw(ArgumentError("CartesianGridMesh1D requires Ny ≥ 2 for PIC interpolation; got Ny=$Ny"))
+    dx = (xmax - xmin) / (Nx - 1)
+    ymin, ymax = 0.0, dx * (Ny - 1)   # square-ish cells; thin extent in y
+    GS = TwoDCartesianGridStatistics(xmin, xmax, Nx, ymin, ymax, Ny; angle=angle, periodic_boundary=(periodic_boundary, true))
+    GMesh = TwoDCartesianGridMesh(GS, mask=mask)
+    return CartesianGridMesh1D(GMesh, GS, ProjetionKernel, SphericalPropagationCorrection_dummy)
+end
+
+# short hand: domain length + point count, x starting at 0
+CartesianGridMesh1D(dimx, nx::Int; kwargs...) = CartesianGridMesh1D(0.0, dimx, nx; kwargs...)
+
+ProjetionKernel(G::CartesianGridMesh1D) = ProjetionKernel(G.stats)
+
+"""
+    gridnotes_1d(grid::CartesianGridMesh1D)
+
+Return the 1D vector of x node positions (one entry per `Nx`), squeezing the thin y-extent.
+"""
+gridnotes_1d(grid::CartesianGridMesh1D) = vec(grid.data.x[:, 1])
 
 
 end # module
