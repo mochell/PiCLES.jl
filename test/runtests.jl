@@ -8,4 +8,5 @@ using Test
     include("unit/test_single_particle_1d_alias_smoke.jl")
     include("unit/test_grids_homogeneous_forcing_smoke.jl")
     include("unit/test_pic_1d_charge_conservation.jl")
+    include("unit/test_pic_2d_blob_energy_window.jl")
 end
