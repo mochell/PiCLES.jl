@@ -13,9 +13,9 @@ addprocs(3)
 
 @everywhere using Setfield, IfElse
 
-@everywhere using PiCLES.ParticleSystems: particle_waves_v5 as PW
+@everywhere using PiCLES.ParticleSystems: particle_waves_v6 as PW
 
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 
 
 @everywhere import PiCLES: FetchRelations, ParticleTools

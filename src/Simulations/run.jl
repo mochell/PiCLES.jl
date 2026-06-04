@@ -1,17 +1,14 @@
-using ..Operators.core_1D: ParticleDefaults as ParticleDefaults1D
 using ..Operators.core_2D: ParticleDefaults as ParticleDefaults2D
 
-using ..Operators.core_1D: SeedParticle! as SeedParticle1D!
 using ..Operators.core_2D: SeedParticle as SeedParticle2D
 
-using ..Architectures: Abstract2DModel, Abstract1DModel
-using ..ParticleMesh: OneDGrid, OneDGridNotes, TwoDGrid, TwoDGridNotes
+using ..Architectures: Abstract2DModel
+using ..ParticleMesh: TwoDGrid, TwoDGridNotes
 
 #using WaveGrowthModels: init_particles!
 #using WaveGrowthModels2D: init_particles!
 using ..Operators.TimeSteppers
 
-using ..Operators.mapping_1D
 using ..Operators.mapping_2D
 using ..ParticleSystems: ForcingData
 using Statistics
@@ -23,10 +20,6 @@ using StructArrays
 
 function mean_of_state(model::Abstract2DModel)
         return mean(model.State[:, :, 1])
-end
-
-function mean_of_state(model::Abstract1DModel)
-        return mean(model.State[:, 1])
 end
 
 """
@@ -182,22 +175,14 @@ function reset_simulation!(sim::Simulation)# where {PP<:Union{ParticleDefaults,N
 end
 
 
-# depreciate, just used for 1D version
-"""
-SeedParticle_mapper(f, p, s, b1, b2, b3, c1, c2, c3, c4, d1, d2 ) = x -> f( p, s, x, b1, b2, b3, c1, c2, c3, c4, d1, d2 )
-maps to SeedParticle! function
-"""
-SeedParticle_mapper(f, p, s, b1, b2, b3, c1, c2, c3, d1, d2) = x -> f(p, s, x, b1, b2, b3, c1, c2, c3, d1, d2)
-
-
 """
 init_particle!(model ; defaults::PP, verbose::Bool=false )
 
-initialize the model.ParticleCollection based on the model.grid and the defaults. 
+initialize the model.ParticleCollection based on the model.grid and the defaults.
 If defaults is nothing, then the model.ODEdev is used.
 usually the initilization uses wind constitions to seed the particles.
 """
-function init_particles!(model::Abstract2DModel; defaults::PP=nothing, forcing=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults1D,ParticleDefaults2D,Nothing}}
+function init_particles!(model::Abstract2DModel; defaults::PP=nothing, forcing=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults2D,Nothing}}
         #defaults        = isnothing(defaults) ? model.ODEdev : defaults
         if verbose
                 @info "seed PiCLES ... \n"
@@ -247,61 +232,4 @@ function init_particles!(model::Abstract2DModel; defaults::PP=nothing, forcing=n
         model.ParticleCollection = ParticleCollection
         nothing
 end
-
-
-
-
-
-### 1D version ###
-# """
-# SeedParticle_mapper(f, p, s, b1, b2, b3, c1, c2, c3, c4, d1, d2 ) = x -> f( p, s, x, b1, b2, b3, c1, c2, c3, c4, d1, d2 )
-# maps to SeedParticle! function
-# """
-# SeedParticle_mapper(f, p, s, b1, b2, b3, c1, c2, c3, d1, d2 )  = x -> f( p, s, x, b1, b2, b3, c1, c2, c3, d1, d2 )
-
-
-"""
-init_particle!(model ; defaults::PP, verbose::Bool=false )
-
-initialize the model.ParticleCollection based on the model.grid and the defaults. 
-If defaults is nothing, then the model.ODEdev is used.
-usually the initilization uses wind constitions to seed the particles.
-"""
-function init_particles!(model::Abstract1DModel; defaults::PP=nothing, verbose::Bool=false) where {PP<:Union{ParticleDefaults1D,ParticleDefaults2D,Nothing}}
-        #defaults        = isnothing(defaults) ? model.ODEdev : defaults
-        if verbose
-                @info "seed PiCLES ... \n"
-                @info "defaults is $(defaults)"
-                if defaults isa Dict
-                        @info "found particle initials, just replace position "
-                else
-                        @info "no particle defaults found, use windsea to seed particles"
-                end
-        end
-
-        gridnotes = OneDGridNotes(model.grid)
-
-        ParticleCollection = []
-        SeedParticle_i = SeedParticle_mapper(SeedParticle1D!, 
-                ParticleCollection, model.State,
-                model.ODEsystem, defaults, model.ODEsettings,
-                gridnotes, model.winds, model.ODEsettings.timestep,
-                model.boundary, model.periodic_boundary)
-
-        map(SeedParticle_i, range(1, length=model.grid.Nx))
-
-
-        # print(defaults)
-        # ParticleCollection=[]
-        # for i in range(1, length=gridnotes.Nx)
-        #         SeedParticle!(ParticleCollection, model.State, i,
-        #                         model.ODEsystem, defaults , model.ODEsettings,
-        #                         gridnotes, model.winds, model.ODEsettings.timestep,
-        #                         model.boundary, model.periodic_boundary  )
-        # end
-
-        model.ParticleCollection = ParticleCollection
-        nothing
-end
-
 

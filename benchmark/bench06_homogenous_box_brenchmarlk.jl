@@ -7,7 +7,7 @@ Pkg.activate("PiCLES/")
 
 # import Plots as plt
 using Setfield
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 
 import PiCLES: FetchRelations, ParticleTools
 using PiCLES.Operators.core_2D: ParticleDefaults, InitParticleInstance, GetGroupVelocity

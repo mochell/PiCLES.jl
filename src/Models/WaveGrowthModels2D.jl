@@ -1,7 +1,7 @@
 module WaveGrowthModels2D
 
 export WaveGrowth2D, init_particles!
-export fields
+export fields, reset_boundary!
 
 using ...Architectures
 

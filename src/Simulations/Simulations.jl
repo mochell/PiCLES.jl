@@ -16,7 +16,6 @@ include("run.jl")
 
 
 using ..ParticleMesh: OneDGrid, OneDGridNotes
-using ..Operators.core_1D: SeedParticle!
 using ..Operators.TimeSteppers
 
 end

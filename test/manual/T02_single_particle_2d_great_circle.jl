@@ -13,7 +13,7 @@ using Plots
 using Setfield
 using IfElse
 
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 using PiCLES.Utils: Init_Standard
 
 import PiCLES: FetchRelations, ParticleTools

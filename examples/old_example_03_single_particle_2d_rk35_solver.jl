@@ -15,7 +15,7 @@ using IfElse
 # include("../src/ParticleSystems/particle_waves_v5.jl")
 
 using PiCLES
-using PiCLES.ParticleSystems: particle_waves_v5 as PW
+using PiCLES.ParticleSystems
 using PiCLES.Utils: Init_Standard
 
 import PiCLES: FetchRelations, ParticleTools
@@ -35,7 +35,7 @@ v(x::Number, y::Number, t::Number) = -(5.0 * sin(t / (3 * 60 * 60 * 2π)) + 0.1)
 
 DT = 6hours
 ParticleState, default_ODE_parameters, WindSeamin, Const_ID = Init_Standard(u(0.0, 0.0, 0.0), v(0.0, 0.0, 0.0), DT)
-particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q)
+particle_system = particle_equations(γ=Const_ID.γ, q=Const_ID.q)
 
 # define simple callback
 # condition(u, t, integrator) = 0.9 * u[1] > log(17)
@@ -62,7 +62,7 @@ particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q)
 #     force_dtmin=true,)
 
 # -------- new ODE setting 
-ODE_settings = PW.ODESettings(
+ODE_settings = ODESettings(
     Parameters=default_ODE_parameters,
     # define mininum energy threshold
     log_energy_minimum=log(WindSeamin["E"]),

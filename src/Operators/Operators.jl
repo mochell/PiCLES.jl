@@ -1,41 +1,23 @@
 module Operators
 
-export core_1D, core_2D, custom_structures, mapping_1D, mapping_2D, TimeSteppers
+export core_2D, custom_structures, mapping_2D, TimeSteppers
 export init_z0_to_State!
 using SharedArrays
 using StaticArrays
 
-# using ..Solvers
+# NOTE: the shared helpers `utils.jl` (callbacks: wrap_pos!, periodic_BD_single_PI!,
+# show_pos!, periodic_condition_x) and `initialize.jl` (init_z0_to_State!) are included
+# once inside `core_2D` and re-exported from there. They are intentionally NOT included
+# directly here: doing so previously defined them both in `Operators` and in the
+# submodules, so `using .core_2D` collided with the local copies and emitted
+# "conflicts with an existing identifier" warnings on every `using PiCLES`.
 
-#include("custom_structures.jl")
-#using .custom_structures
-
-using ..Architectures: AbstractParticleInstance, AbstractMarkedParticleInstance, StateTypeL1
-
-#include("custom_structures.jl")
-using ..custom_structures: ParticleInstance1D, ParticleInstance2D, MarkedParticleInstance
-
-#include("../Utils/FetchRelations.jl")
-using ..FetchRelations
-#include("../ParticleSystems/ParticleSystems.jl")
-#using .ParticleSystems
-
-include("utils.jl")
-
-include("initialize.jl")
-include("core_1D.jl")
 include("core_2D.jl")
-
-include("mapping_1D.jl")
 include("mapping_2D.jl")
 
 include("TimeSteppers.jl")
 
-#using PiCLES.Utils.FetchRelations
-
-using .core_1D
 using .core_2D
-using .mapping_1D
 using .mapping_2D
 using .TimeSteppers
 

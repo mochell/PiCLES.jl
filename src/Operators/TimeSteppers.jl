@@ -2,7 +2,6 @@ module TimeSteppers
 
 export time_step!
 using ...Architectures
-using ..mapping_1D
 using ..mapping_2D
 using ...ParticleSystems: ForcingData
 using ...custom_structures: ForcingCollection, AbstractForcingField, FunctionForcingField, ArrayForcingField
@@ -170,68 +169,6 @@ function max_cgy(model::Abstract2DModel)
     return maximum(model.State[:, :, 3])
 end
 
-
-function mean_of_state(model::Abstract1DModel)
-    return mean(model.State[:, 1])
-end
-
-
-################# 1D ####################
-
-
-"""
-time_step!(model, Δt; callbacks=nothing)
-
-advances model by 1 time step:
-1st) the model.ParticleCollection is advanced and then 
-2nd) the model.State is updated.
-clock is ticked by Δt
-
-callbacks are not implimented yet
-
-"""
-function time_step!(model::Abstract1DModel, Δt; callbacks=nothing, debug=false)
-
-    # temporary FailedCollection to store failed particles
-    FailedCollection = Vector{AbstractMarkedParticleInstance}([])
-
-    for a_particle in model.ParticleCollection
-            #@show a_particle.position_ij
-            mapping_1D.advance!(    a_particle, model.State, FailedCollection, 
-                                    model.grid, model.winds , Δt , 
-                                    model.ODEsettings.log_energy_maximum, 
-                                    model.ODEsettings.wind_min_squared,
-                                    model.periodic_boundary,
-                                    model.ODEdefaults)
-    end
-    if debug
-            model.FailedCollection = FailedCollection
-            @info "advanced: "
-            #@info model.State[8:12, 1], model.State[8:12, 2]
-            @info model.clock.time, model.ParticleCollection[10].ODEIntegrator.t
-            @info model.winds(model.ParticleCollection[10].ODEIntegrator.u[3], model.ParticleCollection[10].ODEIntegrator.t)
-
-    end
-
-    #@printf "re-mesh"
-    for a_particle in model.ParticleCollection
-            mapping_1D.remesh!(     a_particle, model.State, 
-                                    model.winds, model.clock.time, 
-                                    model.ODEsettings, Δt,
-                                    model.minimal_particle,
-                                    model.minimal_state,
-                                    model.ODEdefaults)
-    end
-
-    if debug
-            @info "remeshed: "
-            #@info model.State[8:12, 1], model.State[8:12, 2]
-            @info model.clock.time, model.ParticleCollection[10].ODEIntegrator.t
-
-    end
-
-    tick!(model.clock, Δt)
-end
 
 ################# 2D ####################
 
