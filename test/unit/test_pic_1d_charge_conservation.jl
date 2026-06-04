@@ -78,7 +78,7 @@ end
     # N is 4x the manual script values: 50 -> 200, 100 -> 400
     cases = [
         (name="box right, zero base", N=200, cg=0.2, init=axes -> init_box_case(axes; base=0.0)),
-        (name="box left, zero base", N=400, cg=-0.2, init=axes -> init_box_case(axes; base=0.0)),
+        (name="box left, zero base", N=200, cg=-0.2, init=axes -> init_box_case(axes; base=0.0)),
         (name="sin left, nonlinear advection", N=200, cg=-0.3, init=init_sin_left_case),
     ]
 
