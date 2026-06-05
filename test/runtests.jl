@@ -9,4 +9,6 @@ using Test
     include("unit/test_grids_homogeneous_forcing_smoke.jl")
     include("unit/test_pic_1d_charge_conservation.jl")
     include("unit/test_pic_2d_propagation_energy_conservation.jl")
+    # include("unit/test_1d_wave_growth_quantitative_periodic.jl")
+    include("unit/test_1d_wave_growth_quantitative_single_particle.jl")
 end
