@@ -237,10 +237,12 @@ function WaveGrowth2D(; grid::GG,
         ODEdefaults = ODEinit_type
     elseif ODEinit_type == "wind_sea"
         ODEdefaults = nothing
-    elseif ODEinit_type == "mininmal"
-        ODEdefaults = ParticleDefaults2D(-11.0, 1e-3, 0.0)
+    elseif ODEinit_type == "minimal" || ODEinit_type == "mininmal"
+        # The core particle state is 5D: [lne, c̄_x, c̄_y, x, y].
+        # Use a full default so both 2D runs and 1D-alias (degenerate 2D) runs work.
+        ODEdefaults = ParticleDefaults2D(-11.0, 1e-3, 0.0, 0.0, 0.0)
     else
-        error("ODEinit_type must be either 'wind_sea','mininmal', or ParticleDefaults2D instance ")
+        error("ODEinit_type must be either 'wind_sea', 'minimal' (legacy: 'mininmal'), or a ParticleDefaults2D instance")
     end
 
 
@@ -286,8 +288,8 @@ function WaveGrowth2D(; grid::GG,
     if boundary_type == "wind_sea"
         boundary_defaults = nothing
         @info "use wind_sea boundary"
-    elseif boundary_type == "mininmal"
-        @info "use 'mininmal' boundary (1min with 2m/s)"
+    elseif boundary_type == "minimal" || boundary_type == "mininmal"
+        @info "use 'minimal' boundary (1min with 2m/s)"
         #FetchRelations.MinimalWindsea(u(0, 0), ODEsets.DT)
         WindSeamin = FetchRelations.MinimalWindsea(1, 1, 5*60) # 5 min with 2 m/s
         #WindSeamin = FetchRelations.MinimalWindsea(u(0, 0, 0), v(0, 0, 0), DT / 2)
@@ -301,7 +303,7 @@ function WaveGrowth2D(; grid::GG,
         @info "use default value boundary"
         boundary_defaults = ODEdefaults
     else
-        error("boundary_type must be either 'wind_sea','mininmal', or 'same' ")
+        error("boundary_type must be either 'wind_sea', 'minimal' (legacy: 'mininmal'), or 'same'")
     end
 
 
