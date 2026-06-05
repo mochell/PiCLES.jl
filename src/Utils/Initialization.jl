@@ -18,7 +18,7 @@ function Init_Standard(uscale, vscale, DT; r_g0=0.85)
     default_ODE_parameters = (
         r_g=r_g0,
         C_α=Const_Scg.C_alpha,
-        C_φ=Const_ID.c_β,
+        C_φ=Const_Scg.C_varphi,
         C_e=Const_ID.C_e,
         g=9.81,
     )
