@@ -3,6 +3,7 @@ using DataStructures
 
 using ..Architectures: CartesianGrid2D, SphericalGrid2D
 using ..ParticleMesh
+using ..Grids.CartesianGrid: CartesianGridMesh1D, gridnotes_1d
 #using Simulation
 
 struct EmptyStore{Int} <: AbstractStore
@@ -216,10 +217,20 @@ convert_store_to_tuple(store::CashStore)
 creates a NamedTuple with the data, x, and time from the CashStore
 """
 function convert_store_to_tuple(store::CashStore, sim)
-    store_data = cat(store.store..., dims=3)
-    store_waves_data = permutedims(store_data, (3, 1, 2))
-    wave_x = OneDGridNotes(sim.model.grid).x
-    wave_time = collect(range(0, sim.stop_time + sim.Δt, length=length(store_waves_data[:, 1, 3])))
+    grid = sim.model.grid
+    if grid isa CartesianGridMesh1D
+        # 1D run: every stored frame is (Nx, Ny, 3); all y-rows are identical, so squeeze row 1.
+        j = 1
+        frames = [Array(s)[:, j, :] for s in store.store]   # each (Nx, 3)
+        store_data = cat(frames..., dims=3)                 # (Nx, 3, T)
+        store_waves_data = permutedims(store_data, (3, 1, 2))  # (T, Nx, 3)
+        wave_x = gridnotes_1d(grid)
+    else
+        store_data = cat(store.store..., dims=3)
+        store_waves_data = permutedims(store_data, (3, 1, 2))
+        wave_x = OneDGridNotes(grid).x
+    end
+    wave_time = collect(range(0, sim.stop_time + sim.Δt, length=size(store_waves_data, 1)))
     return (data=store_waves_data, x=wave_x, time=wave_time)
 end
 

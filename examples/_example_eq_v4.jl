@@ -18,7 +18,7 @@ using PiCLES.Simulations
 using PiCLES.Plotting
 
 #using PiCLES.Debugging
-using PiCLES.ParticleSystems: particle_waves_v4 as PW
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
 
 using Oceananigans.TimeSteppers: Clock, tick!
 import Oceananigans: fields

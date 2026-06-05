@@ -18,8 +18,8 @@ using PiCLES.Simulations
 using PiCLES.Plotting
 
 #using PiCLES.Debugging
-using PiCLES.ParticleSystems: particle_waves_v3beta as PW
-using PiCLES.ParticleSystems.particle_waves_v4: get_I_D_constant
+using PiCLES.ParticleSystems: particle_waves_v6 as PW
+using PiCLES.ParticleSystems.particle_waves_v6: get_I_D_constant
 
 
 using Oceananigans.TimeSteppers: Clock, tick!

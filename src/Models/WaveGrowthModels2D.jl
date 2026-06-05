@@ -1,7 +1,7 @@
 module WaveGrowthModels2D
 
 export WaveGrowth2D, init_particles!
-export fields
+export fields, reset_boundary!
 
 using ...Architectures
 
@@ -22,7 +22,7 @@ import Oceananigans: fields
 using Oceananigans.TimeSteppers: Clock
 using ...FetchRelations
 
-using ...custom_structures: ParticleInstance2D
+using ...custom_structures: ParticleInstance2D, ForcingCollection
 
 using ...Grids: make_boundary_lists
 #includet("mapping_1D.jl")
@@ -32,7 +32,7 @@ using ...Grids: make_boundary_lists
 
 
 """
-    WaveGrowth2D{Grid, Lay, Tim, Clo, stat, PC, Ovar, Osys, Oses, Odev, bl_flag, bl, wnds, cur}
+    WaveGrowth2D{Grid, Lay, Tim, Clo, stat, PC, Ovar, Osys, Oses, Odev, bl_flag, bl, frc, cur}
 
     WaveGrowth2D is a model for simulating wave growth in a 1D domain. 
     The model is based on the particle method, where each particle represents wave statistics at a given point in space.
@@ -56,7 +56,7 @@ mutable struct WaveGrowth2D{Grid<:AbstractGrid,
                         bl_flag,
                         bl,
                         bl_type,
-                        wnds,
+                        frc,
                         cur,
     Mstat} <: Abstract2DModel where {Mstat<:Union{Nothing,stat},PCollection<:Union{Vector,Array,StructArray}}
     #Union{Vector,DArray}
@@ -83,11 +83,20 @@ mutable struct WaveGrowth2D{Grid<:AbstractGrid,
     ocean_points::Vector
     boundary_points::Vector
 
-    winds::wnds     # u, v, if needed u_x, u_y
+    winds::frc     # wind forcing, minimally u and v
     currents::cur      # u, v, currents
 
     MovieState::Mstat     # state of of the model. Only used for producing movieframes
 
+end
+
+function Base.getproperty(ow::WaveGrowth2D, s::Symbol)
+    if s === :forcing
+        winds = getfield(ow, :winds)
+        winds === nothing && return nothing
+        return ForcingCollection(u_wind=winds.u, v_wind=winds.v)
+    end
+    return getfield(ow, s)
 end
 
 
@@ -177,10 +186,10 @@ function mark_boundary(grid::MeshGrids)
 end
 
 """  
-WaveGrowth2D(; grid, winds, ODEsys, ODEvars, layers, clock, ODEsets, ODEdefaults, currents, periodic_boundary, CBsets)
+WaveGrowth2D(; grid, forcing, ODEsys, ODEvars, layers, clock, ODEsets, ODEdefaults, currents, periodic_boundary, CBsets)
 This is the constructor for the WaveGrowth2D model. The inputs are:
     grid             : the grid used in the model,
-    winds            : the wind interpolation function here only 1D,
+    forcing          : forcing collection with wind functions,
     ODEsys           : the ODE system used in the model,
     ODEvars          : the variables in the ODE system,
     layers           : the number of layers used in the model (default 1),
@@ -192,7 +201,7 @@ This is the constructor for the WaveGrowth2D model. The inputs are:
     CBsets           : the callback settings (not implimented yet).
 """
 function WaveGrowth2D(; grid::GG,
-    winds::NamedTuple{(:u, :v)}, 
+    winds=nothing,
     ODEsys, 
     ODEvars=nothing, #needed for MTK for ODEsystem. will be depriciated later
     layers::Int=1,
@@ -206,6 +215,10 @@ function WaveGrowth2D(; grid::GG,
     boundary_type="same", # or "minimal", "same", default is same, only used if periodic_boundary is false
     CBsets=nothing,
     movie=false) where {PP<:Union{ParticleDefaults2D,String},GG<:AbstractGrid}
+
+    if !isnothing(winds) && !(haskey(winds, :u) && haskey(winds, :v))
+        error("`winds` must provide fields `u` and `v`")
+    end
 
     # initialize state {SharedArray} given grid and layers
     # Number of state variables 

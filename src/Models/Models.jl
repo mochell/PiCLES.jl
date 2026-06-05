@@ -2,10 +2,12 @@ module Models
 
 export WaveGrowthModels1D, WaveGrowthModels2D, reset_boundary!
 
-include("WaveGrowthModels1D.jl")
+# WaveGrowthModels2D must be loaded first: WaveGrowthModels1D's `WaveGrowth1D` constructor
+# returns a `WaveGrowth2D`.
 include("WaveGrowthModels2D.jl")
+include("WaveGrowthModels1D.jl")
 
-using .WaveGrowthModels1D
 using .WaveGrowthModels2D
+using .WaveGrowthModels1D
 
 end

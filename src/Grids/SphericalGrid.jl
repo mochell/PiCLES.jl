@@ -1,6 +1,6 @@
 module SphericalGrid
 
-using ...Architectures: AbstractGrid, AbstractGridStatistics, CartesianGrid1D, SphericalGrid, CartesianGridStatistics, AbstractBoundary, BoundaryType, SphericalGridStatistics, SphericalGrid2D
+using ...Architectures: AbstractGrid, AbstractGridStatistics, CartesianGrid1D, CartesianGridStatistics, AbstractBoundary, BoundaryType, SphericalGridStatistics, SphericalGrid2D
 using ...custom_structures: N_Periodic, N_NonPeriodic, N_TripolarNorth
 
 #using LinearAlgebra
