@@ -6,7 +6,6 @@ steps, the final total domain energy remains within +/-2% of the energy at step 
 """
 
 using Test
-using IfElse
 
 using PiCLES
 using PiCLES.ParticleSystems
@@ -31,9 +30,9 @@ function energy_series_for_case(; cgx, cgy, steps=100)
     DT = Float64(20minutes)
 
     ODEpars, Const_ID, _ = ODEParameters(r_g=0.85)
-    u(x, y, t) = IfElse.ifelse.(x .< 250e3, U10, 0.00) + y * 0.0 + t * 0.0
-    v(x, y, t) = IfElse.ifelse.(x .< 250e3, V10, 0.00) + y * 0.0 + t * 0.0
-    forcing = PiCLES.ForcingCollection(u_wind=u, v_wind=v)
+    u(x, y, t) = ifelse.(x .< 250e3, U10, 0.00) + y * 0.0 + t * 0.0
+    v(x, y, t) = ifelse.(x .< 250e3, V10, 0.00) + y * 0.0 + t * 0.0
+    forcing = PiCLES.custom_structures.ForcingCollection(u_wind=u, v_wind=v)
 
     grid = TwoDCartesianGridMesh(400e3, 41, 300e3, 31; periodic_boundary=(true, true))
 
