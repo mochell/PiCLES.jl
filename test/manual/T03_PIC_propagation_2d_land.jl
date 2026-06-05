@@ -12,7 +12,7 @@ Interactive script for boundary and mask behavior inspection.
 import Plots as plt
 using Setfield, IfElse
 
-using PiCLES.ParticleSystems: particle_waves_v6 as PW
+using PiCLES.ParticleSystems
 
 import PiCLES: FetchRelations, ParticleTools
 using PiCLES.Operators.core_2D: ParticleDefaults, InitParticleInstance, GetGroupVelocity
@@ -49,6 +49,7 @@ using StructArrays
 using BenchmarkTools
 
 using PiCLES.Grids
+using PiCLES
 
 using PiCLES.Operators.TimeSteppers: time_step!
 #using OrdinaryDiffEq
@@ -63,7 +64,7 @@ pwd()
 U10, V10 = 15.0, -10.0
 DT = 20minutes
 
-ODEpars, Const_ID, Const_Scg = PW.ODEParameters(r_g=0.85)
+ODEpars, Const_ID, Const_Scg = ODEParameters(r_g=0.85)
 
 
 u(x, y, t) = IfElse.ifelse.(x .< 250e3, U10, 0.00) + y * 0.0 + t * 0.0
@@ -71,7 +72,7 @@ v(x, y, t) = IfElse.ifelse.(x .< 250e3, V10, 0.00) + y * 0.0 + t * 0.0 .* cos(t 
 
 # u(x, y, t) = U10 + x * 0.0 + y * 0.0 + t * 0.0
 # v(x, y, t) = V10 + x * 0.0 + y * 0.0 + t * 0.0
-winds = (u=u, v=v)
+forcing = PiCLES.custom_structures.ForcingCollection(u_wind=u, v_wind=v)
 
 grid = TwoDCartesianGridMesh(400e3, 41, 200e3, 21, periodic_boundary=(false, true))
 heatmap(grid.data.x[:, 1], grid.data.y[1, :], transpose(grid.data.mask))
@@ -89,7 +90,7 @@ heatmap(grid.data.x[:,1], grid.data.y[1,:], transpose(grid.data.mask))
 # heatmap(transpose(v.(grid.data.x, grid.data.y, 0)))
 
 # %%
-particle_system = PW.particle_equations(u, v, γ=Const_ID.γ, q=Const_ID.q, 
+particle_system = particle_equations(γ=Const_ID.γ, q=Const_ID.q,
     propagation=true,
     input=false, 
     dissipation=false,
@@ -106,7 +107,7 @@ lne_local = log(WindSeamin["E"])
 cg_u_local = WindSeamin["cg_bar_x"]
 cg_v_local = WindSeamin["cg_bar_y"]
 
-ODE_settings = PW.ODESettings(
+ODE_settings = ODESettings(
     Parameters=ODEpars,
     # define mininum energy threshold
     log_energy_minimum=lne_local,#log(FetchRelations.Eⱼ(0.1, DT)),
@@ -137,7 +138,6 @@ end
 default_windsea = FetchRelations.get_initial_windsea(U10, V10, DT,particle_state=true )
 default_particle = ParticleDefaults(lne_local, cg_u_local, cg_v_local, 0.0, 0.0)
 wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
-    winds=winds,
     ODEsys=particle_system,
     ODEsets=ODE_settings,  # ODE_settings
     ODEinit_type=ParticleDefaults2D(default_windsea[1], default_windsea[2], default_windsea[3], 0.0, 0.0),
@@ -151,7 +151,10 @@ wave_model = WaveGrowthModels2D.WaveGrowth2D(; grid=grid,
 #wave_model.minimal_state = 2 * wave_model.minimal_state
 
 # ### build Simulation
-wave_simulation = Simulation(wave_model, Δt=10minutes, stop_time=4hours)#1hours)
+wave_simulation = Simulation(wave_model,
+    forcing=forcing,
+    Δt=10minutes,
+    stop_time=4hours) #1hours)
 initialize_simulation!(wave_simulation)
 plot_particle_collection(wave_model)
 
@@ -160,8 +163,14 @@ PI = wave_simulation.model.ParticleCollection[2,1]
 step!(PI.ODEIntegrator, DT, true)
 
 model = wave_simulation.model
+FailedCollection = Vector{AbstractMarkedParticleInstance}([])
+forcing_xy = TimeSteppers.time_slice_forcing(wave_simulation.forcing, model.grid, model.clock.time)
+wind_i = (
+    forcing_xy.u(PI.position_xy[1], PI.position_xy[2]),
+    forcing_xy.v(PI.position_xy[1], PI.position_xy[2]),
+)
 mapping_2D.advance!(PI, model.State, FailedCollection,
-    model.grid, model.winds, wave_simulation.Δt,
+    model.grid, wind_i, wave_simulation.Δt,
     model.ODEsettings.log_energy_maximum,
     model.ODEsettings.wind_min_squared,
     model.periodic_boundary,
@@ -171,10 +180,15 @@ mapping_2D.advance!(PI, model.State, FailedCollection,
 # %% Adance only test
 model = wave_simulation.model
 FailedCollection = Vector{AbstractMarkedParticleInstance}([])
+forcing_xy = TimeSteppers.time_slice_forcing(wave_simulation.forcing, model.grid, model.clock.time)
 for a_particle in model.ParticleCollection[findall(model.grid.data.mask .== 1)]
     @info a_particle.position_ij
+    wind_i = (
+        forcing_xy.u(a_particle.position_xy[1], a_particle.position_xy[2]),
+        forcing_xy.v(a_particle.position_xy[1], a_particle.position_xy[2]),
+    )
     mapping_2D.advance!(a_particle, model.State, FailedCollection,
-        model.grid, model.winds, wave_simulation.Δt,
+        model.grid, wind_i, wave_simulation.Δt,
         model.ODEsettings.log_energy_maximum,
         model.ODEsettings.wind_min_squared,
         model.periodic_boundary,
@@ -193,7 +207,7 @@ end
 plot_particle_collection(wave_model)
 
 for i in 1:1:180
-    TimeSteppers.time_step!(wave_simulation.model, wave_simulation.Δt)
+    TimeSteppers.time_step!(wave_simulation.model, wave_simulation.Δt; forcing=wave_simulation.forcing)
 
     if i%8 == 0
         plot_particle_collection(wave_simulation.model)
