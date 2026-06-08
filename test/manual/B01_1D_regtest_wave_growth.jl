@@ -139,6 +139,11 @@ DD_failed     = Dict()
 PIC_per      = nothing
 PIC_nonper   = nothing
 wave_model   = nothing
+wave_model_saved = nothing
+u10_saved    = nothing
+DT_saved     = nothing
+WindSeamin_saved = nothing
+ODE_settings_saved = nothing
 
 case_list = [
 (u10 = 15.0, DT = 10minutes, Nx = 21),
@@ -160,6 +165,7 @@ u10, DT, Nx = case_list[end]
 1e7/ 200 
 
 for case in case_list
+    global wave_model_saved, u10_saved, DT_saved, WindSeamin_saved, ODE_settings_saved
 
     #u10         = 15.0
     # DT          = 10minutes
@@ -203,6 +209,14 @@ for case in case_list
             periodic_boundary=false,
             boundary_type="same"  # "default" #
         )
+
+        if wave_model_saved === nothing
+            wave_model_saved = wave_model
+            u10_saved = u10
+            DT_saved = DT
+            WindSeamin_saved = WindSeamin
+            ODE_settings_saved = ODE_settings
+        end
 
         # non periodic boundary
         wave_simulation = Simulation(wave_model, Δt=DT, stop_time=T)
@@ -253,52 +267,49 @@ DDcollect["failed_cases"] = DD_failed
 
 T_test, save_time_test = 2*24hours , 20minutes
 
-xx                         = gridnotes_1d(wave_model.grid)[1]
-WindSeamin                 = FetchRelations.get_initial_windsea(u10, DT)
-ODE_settings               = wave_model.ODEsettings
+xx                         = gridnotes_1d(wave_model_saved.grid)[1]
+WindSeamin                 = FetchRelations.get_initial_windsea(u10_saved, DT_saved)
+ODE_settings               = wave_model_saved.ODEsettings
 particle_defaults          = ParticleDefaults(log(WindSeamin["E"]), WindSeamin["cg_bar"], 0.0, xx, 0.0)
-ParticleState, particle_on = InitParticleValues(particle_defaults, (xx, 0.0), (u10, 0.0), DT)
-forcing_1d                 = PW.ForcingData(u_wind=u10, v_wind=0.0)
-PI4                        = InitParticleInstance(wave_model.ODEsystem, ParticleState, ODE_settings, forcing_1d, (1, 1), (xx, 0.0), false, particle_on)
+ParticleState, particle_on = InitParticleValues(particle_defaults, (xx, 0.0), (u10_saved, 0.0), DT_saved)
+forcing_1d                 = PW.ForcingData(u_wind=u10_saved, v_wind=0.0)
+PI4                        = InitParticleInstance(wave_model_saved.ODEsystem, ParticleState, ODE_settings, forcing_1d, (1, 1), (xx, 0.0), false, particle_on)
 
 
 PI = format_particle_data_saved(PI4, T_test; saveat=save_time_test)
 
 PI4.ODEIntegrator
 
-PI1D_x_tilde = FR.X_tilde(PI.x, u10)
-PI1D_t_tilde = FR.t_tilde(PI.time, u10)
-PI1D= Dict(   "x_tilde" => PI1D_x_tilde, 
-        "t_tilde" => PI1D_t_tilde, 
-        "E_tilde" => FR.E_tilde(PI.E, u10),
-        "Fp_tilde" => FR.f_p_tilde(get_fp_from_cg(PI.cgx / ODEpars.r_g), u10), 
+PI1D_x_tilde = FR.X_tilde(PI.x, u10_saved)
+PI1D_t_tilde = FR.t_tilde(PI.time, u10_saved)
+PI1D= Dict(   "x_tilde" => PI1D_x_tilde,
+        "t_tilde" => PI1D_t_tilde,
+        "E_tilde" => FR.E_tilde(PI.E, u10_saved),
+        "Fp_tilde" => FR.f_p_tilde(get_fp_from_cg(PI.cgx / ODEpars.r_g), u10_saved), 
         "label" => "Single Particle 1D",
         "attrs" => nothing)
 
 
-plot!(p_diag, PI1D_t_tilde, PI1D["E_tilde"], linestyle=:dash, lw=3, marker=:x, ms=3, label="Single Particle 1D", subplot=1)
-
-plot!(p_diag, PI1D_t_tilde, PI1D["Fp_tilde"], linestyle=:dash, lw=3, marker=:x, ms=3, label="Single Particle 1D", subplot=2)
 
 
 # % single particle 2D
-u2(x, y, t) = x .* 0 + t * 0 + u10
-v2(x, y, t) = x .* 0 + t * 0 + y *0 
-WindSeamin                 = FetchRelations.get_initial_windsea(u10, 0,  DT)
+u2(x, y, t) = x .* 0 + t * 0 + u10_saved
+v2(x, y, t) = x .* 0 + t * 0 + y *0
+WindSeamin                 = FetchRelations.get_initial_windsea(u10_saved, 0,  DT_saved)
 particle_defaults          = ParticleDefaults(log(WindSeamin["E"]), WindSeamin["cg_bar_x"], WindSeamin["cg_bar_y"], xx, xx)
-ParticleState, particle_on = InitParticleValues(particle_defaults, (xx, xx), (u2(xx, xx, 0), 0.0), DT)
+ParticleState, particle_on = InitParticleValues(particle_defaults, (xx, xx), (u2(xx, xx, 0), 0.0), DT_saved)
 ODESystem2D                = PW.particle_equations(γ=Const_ID.γ, q=Const_ID.q, IDConstants=Const_ID)
-forcing_2d                 = PW.ForcingData(u_wind=u10, v_wind=0.0)
+forcing_2d                 = PW.ForcingData(u_wind=u10_saved, v_wind=0.0)
 PI5                        = InitParticleInstance(ODESystem2D, ParticleState, ODE_settings, forcing_2d, (1, 1), (xx, xx), false, particle_on)
 
 PI2 = format_particle_data_saved(PI5, T_test; saveat=save_time_test)
 
-PI2D_x_tilde = FR.X_tilde(PI2.x, u10)
-PI2D_t_tilde = FR.t_tilde(PI2.time, u10)
-PI2D= Dict(   "x_tilde" => PI2D_x_tilde, 
-        "t_tilde" => PI2D_t_tilde, 
-        "E_tilde" => FR.E_tilde(PI2.E, u10),
-        "Fp_tilde" => FR.f_p_tilde(get_fp_from_cg(PI2.cgx / ODEpars.r_g), u10), 
+PI2D_x_tilde = FR.X_tilde(PI2.x, u10_saved)
+PI2D_t_tilde = FR.t_tilde(PI2.time, u10_saved)
+PI2D= Dict(   "x_tilde" => PI2D_x_tilde,
+        "t_tilde" => PI2D_t_tilde,
+        "E_tilde" => FR.E_tilde(PI2.E, u10_saved),
+        "Fp_tilde" => FR.f_p_tilde(get_fp_from_cg(PI2.cgx / ODEpars.r_g), u10_saved), 
         "label" => "Single Particle 2D",
         "attrs" => nothing)
 
@@ -340,6 +351,15 @@ for sp in 1:4
     plot!(p_diag, subplot=sp, xlims=(minimum(t_ref), maximum(t_ref)))
 end
 
+cg_JON_t = FR.c_p_fetch.(x_tilde_tau_ref, u10_ref) / 2
+fp_JON_t = get_fp_from_cg(cg_JON_t)
+
+plot!(p_diag, PI1D_t_tilde, PI1D["E_tilde"], linestyle=:dash, lw=3, marker=:x, ms=3, label="Single Particle 1D", subplot=1)
+
+plot!(p_diag, PI1D_t_tilde, PI1D["Fp_tilde"], linestyle=:dash, lw=3, marker=:x, ms=3, label="Single Particle 1D", subplot=2)
+
+
+
 # Top-left: single-particle comparison (Energy)
 plot!(p_diag, t_ref, FR.E_fetch_tilde(x_tilde_tau_ref), label="JONSWAP", lw=3, lc=:green, subplot=1)
 plot!(p_diag, t_ref, t_ref * 0 .+ PM.E_tilde, label="PW64", lw=3, lc=:black, subplot=1)
@@ -375,8 +395,6 @@ end
 
 # Bottom-right: periodic case sweep (Peak frequency)
 plot!(p_diag, t_ref, t_ref * 0 .+ PM.f_p_tilde, label="PW64", lw=3, lc=:black, subplot=4)
-cg_JON_t = FR.c_p_fetch.(x_tilde_tau_ref, u10_ref) / 2
-fp_JON_t = get_fp_from_cg(cg_JON_t)
 plot!(p_diag, t_ref, FR.f_p_tilde(fp_JON_t, u10_ref), label="JONSWAP", lw=3, lc=:green,
     ylim=(0.1, 0.4), subplot=4)
 for case_key in case_keys
@@ -393,7 +411,7 @@ end
 display(p_diag)
 
 # save figure
-savefig(p_diag, joinpath(plot_path_base, "B01_1D_PW_tuning_space_periodic_u$(u10).png"))
+savefig(p_diag, joinpath(plot_path_base, "B01_1D_PW_tuning_space_periodic_u$(u10_saved).png"))
 
 # %%
 
