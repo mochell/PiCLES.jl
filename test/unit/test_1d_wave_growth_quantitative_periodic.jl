@@ -81,8 +81,15 @@ end
         (u10 = 15.0, DT = 10minutes, Nx = 101),
     ]
 
-    @testset "Periodic case sweep" begin
-        for (i, case) in enumerate(case_list)
+    # B-spline deposition order sweep. The full case list runs at P=1 (CIC, the established
+    # coverage); higher orders P=2,3 are validated on a representative case to keep runtime
+    # reasonable while confirming the wave-growth physics is unchanged by the deposition order
+    # (issues #59, #60). Index 2 is the u10=15, DT=10min, Nx=101 case.
+    cases_for_order = Dict(1 => collect(eachindex(case_list)), 2 => [2], 3 => [2])
+
+    @testset "Periodic case sweep, spline_order=$(P)" for P in (1, 2, 3)
+        for i in cases_for_order[P]
+            case = case_list[i]
             u10, DT, Nx = case
             t_target_sec = T_TILDE_TARGET * u10 / 9.81
             stop_time = t_target_sec + DT
@@ -108,7 +115,8 @@ end
                 ODEinit_type="mininmal",
                 minimal_particle=FetchRelations.MinimalParticle(u10, 0, DT),
                 periodic_boundary=true,
-                boundary_type="same")
+                boundary_type="same",
+                spline_order=P)
 
             sim = Simulation(model, Δt=DT, stop_time=stop_time, verbose=false)
             initialize_simulation!(sim)

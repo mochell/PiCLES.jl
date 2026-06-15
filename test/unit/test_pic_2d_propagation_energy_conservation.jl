@@ -21,11 +21,11 @@ using Oceananigans.Units
 function seed_blob!(sim; cgx, cgy, patch_i=5:15, patch_j=5:15)
     for PI in sim.model.ParticleCollection[patch_i, patch_j]
         reset_PI_u!(PI, ui=FetchRelations.get_initial_windsea(cgx, cgy, 2hour, particle_state=true))
-        ParticleToNode!(PI, sim.model.State, sim.model.grid, sim.model.periodic_boundary)
+        ParticleToNode!(PI, sim.model.State, sim.model.grid, sim.model.periodic_boundary, Val(sim.model.spline_order))
     end
 end
 
-function energy_series_for_case(; cgx, cgy, steps=100)
+function energy_series_for_case(; cgx, cgy, steps=100, spline_order=1)
     U10, V10 = 0.0, 0.0
     DT = Float64(20minutes)
 
@@ -69,6 +69,7 @@ function energy_series_for_case(; cgx, cgy, steps=100)
         ODEinit_type=ParticleDefaults(particle_min),
         periodic_boundary=true,
         boundary_type="same",
+        spline_order=spline_order,
         movie=false,
     )
 
@@ -93,17 +94,21 @@ end
         (name="lower-left", cgx=-10.0, cgy=-12.0),
     ]
 
-    for case in cases
-        e = energy_series_for_case(; cgx=case.cgx, cgy=case.cgy, steps=100)
-        @test length(e) == 100
+    # Sweep B-spline deposition order. Partition of unity makes the deposit conservative at every
+    # order, so the same ±2% window must hold for P = 1, 2, 3 (issues #59, #60).
+    @testset "spline_order=$(P)" for P in (1, 2, 3)
+        for case in cases
+            e = energy_series_for_case(; cgx=case.cgx, cgy=case.cgy, steps=100, spline_order=P)
+            @test length(e) == 100
 
-        e_ref = e[3]
-        e_final = e[end]
+            e_ref = e[3]
+            e_final = e[end]
 
-        @test isfinite(e_ref) && isfinite(e_final)
-        @test e_ref != 0.0
+            @test isfinite(e_ref) && isfinite(e_final)
+            @test e_ref != 0.0
 
-        rel_change = abs(e_final - e_ref) / abs(e_ref)
-        @test rel_change <= 0.02
+            rel_change = abs(e_final - e_ref) / abs(e_ref)
+            @test rel_change <= 0.02
+        end
     end
 end
