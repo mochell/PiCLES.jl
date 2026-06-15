@@ -332,7 +332,9 @@ function movie_time_step!(model::Abstract2DModel, Δt; forcing=nothing, callback
     current_forcing === nothing && error("2D movie_time_step! requires forcing data (pass `forcing=...` to Simulation or set `model.winds`)")
     forcing_xy = time_slice_forcing(current_forcing, model.grid, model.clock.time)
 
-    time_step!_advance(model, Δt, forcing_xy, FailedCollection)
+    # resolve B-spline deposition order Int -> Val{P} once (function barrier); see time_step!
+    spline_val = Val(hasproperty(model, :spline_order) ? model.spline_order : 1)
+    time_step!_advance(model, Δt, forcing_xy, FailedCollection, spline_val)
 
     model.MovieState = copy(model.State)
 
