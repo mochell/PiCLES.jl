@@ -321,11 +321,19 @@ function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
 
         # minimal_state[1] is the minimal Energy
         # minimal_state[2] is the minimal momentum squared
+        m_amp_min = ODEs.m_amp_minimum
+        m_amp    = speed(u_state[2], u_state[3])
+
         if ~PI.boundary & (u_state[1] >= minimal_state[1]) & (speed_square(u_state[1], u_state[2]) >= minimal_state[2])
-                # interior nodes: convert node state to particle values and push to ODEIntegrator
-                ui = GetVariablesAtVertex(u_state, xy[1], xy[2])
-                reset_PI_ut!(PI, ui, last_t; dt_init=ODEs.dt)
-                PI.on = true
+                if m_amp < m_amp_min
+                        # M3: zero-net-momentum — deactivate; wind branch below will re-seed if winds are present
+                        PI.on = false
+                else
+                        # interior nodes: convert node state to particle values and push to ODEIntegrator
+                        ui = GetVariablesAtVertex(u_state, xy[1], xy[2], m_amp_min=m_amp_min)
+                        reset_PI_ut!(PI, ui, last_t; dt_init=ODEs.dt)
+                        PI.on = true
+                end
 
         elseif ~PI.boundary & (wind_speed_squared >= ODEs.wind_min_squared)
                 # local wind is strong enough to reset from default particle
@@ -340,9 +348,14 @@ function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
                 PI.on = true
 
         elseif (u_state[1] >= minimal_state[1])
-                ui = GetVariablesAtVertex(u_state, xy[1], xy[2])
-                reset_PI_ut!(PI, ui, last_t; dt_init=ODEs.dt)
-                PI.on = true
+                if m_amp < m_amp_min
+                        # M3: zero-net-momentum with no wind to re-seed — deactivate
+                        PI.on = false
+                else
+                        ui = GetVariablesAtVertex(u_state, xy[1], xy[2], m_amp_min=m_amp_min)
+                        reset_PI_ut!(PI, ui, last_t; dt_init=ODEs.dt)
+                        PI.on = true
+                end
 
         else
                 PI.on = false

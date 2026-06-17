@@ -124,6 +124,8 @@ $(DocStringExtensions.FIELDS)
 
     "minimum needed squared wind velocity to seed particle"
     wind_min_squared::Float64 = 4.0
+    "minimum momentum amplitude for vertex reconstruction; below this threshold the direction is ill-defined"
+    m_amp_minimum::Float64 = 1e-6
     "solver method for ODE system"
     #alternatives
     #Rosenbrock23(), AutoVern7(Rodas4()) ,AutoTsit5(Rosenbrock23()) , Tsit5()

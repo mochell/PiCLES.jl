@@ -304,7 +304,7 @@ function merge!(grid_point::Vector{Float64}, charge::Vector{Float64}; verbose=fa
         cosθ = 1
     else
         # calculate angle between both
-        cosθ = grid_point[2] * charge[2] + grid_point[3] * grid_point[3] / (norm(grid_point[2:3]) * norm(charge[2:3]))
+        cosθ = (grid_point[2] * charge[2] + grid_point[3] * charge[3]) / (norm(grid_point[2:3]) * norm(charge[2:3]))
     end
 
     if (cosθ >= 0.5)

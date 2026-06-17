@@ -124,9 +124,9 @@ i_state: [e, m_x, m_y] state vector at node
 x, y: coordinates of the vertex
 
 """
-function GetVariablesAtVertex(i_State::TT, x::Float64, y::Float64) where {TT<:Union{Vector{Float64},MVector{3,Float64}}}
+function GetVariablesAtVertex(i_State::TT, x::Float64, y::Float64; m_amp_min::Float64=1e-6) where {TT<:Union{Vector{Float64},MVector{3,Float64}}}
     e, m_x, m_y = i_State
-    m_amp = speed(m_x, m_y)
+    m_amp = max(speed(m_x, m_y), m_amp_min)
     c_x = m_x * e / (2 * m_amp^2)
     c_y = m_y * e / (2 * m_amp^2)
 
@@ -141,11 +141,11 @@ Get_u_FromShared(PI::AbstractParticleInstance, S::StateTypeL1,) = S[PI.position_
 GetGroupVelocity(i_State::Vector{Float64})
 i_state: [e, m_x, m_y] state vector at node
 """
-function GetGroupVelocity(i_State)
+function GetGroupVelocity(i_State; m_amp_min::Float64=1e-6)
         e = i_State[:,:,1]
         m_x = i_State[:,:,2]
         m_y = i_State[:,:,3]
-        m_amp = speed.(m_x, m_y)
+        m_amp = max.(speed.(m_x, m_y), m_amp_min)
         c_x = m_x .* e ./ (2 .* m_amp.^2)
         c_y = m_y .* e ./ (2 .* m_amp.^2)
 
