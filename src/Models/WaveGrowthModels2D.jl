@@ -89,6 +89,7 @@ mutable struct WaveGrowth2D{Grid<:AbstractGrid,
     MovieState::Mstat     # state of of the model. Only used for producing movieframes
 
     spline_order::Base.Int  # B-spline order for particle->grid deposition (1=CIC, 2=TSC, 3=cubic)
+    windsea_merge::Base.Bool  # node deposition rule: false = additive (default); true = Hanson&Phillips wind-sea-favoured merge! contest
 
 end
 
@@ -217,6 +218,7 @@ function WaveGrowth2D(; grid::GG,
     boundary_type="same", # or "minimal", "same", default is same, only used if periodic_boundary is false
     CBsets=nothing,
     spline_order::Int=1,  # B-spline deposition order: 1=CIC (default), 2=TSC, 3=cubic
+    windsea_merge::Bool=false,  # false = additive deposition (default); true = wind-sea-favoured merge! (Hanson&Phillips 2001)
     movie=false) where {PP<:Union{ParticleDefaults2D,String},GG<:AbstractGrid}
 
     if !isnothing(winds) && !(haskey(winds, :u) && haskey(winds, :v))
@@ -369,7 +371,8 @@ function WaveGrowth2D(; grid::GG,
         winds,
         currents,
         Mstat,
-        spline_order)
+        spline_order,
+        windsea_merge)
 end
 
 

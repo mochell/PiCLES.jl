@@ -52,7 +52,9 @@ S       Shared array where particles are stored
 G       (TwoDGrid) Grid that defines the nodepositions
 """
 
-function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGrid, periodic_boundary::Bool, spline::Val=Val(1))
+function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGrid, periodic_boundary::Bool, spline::Val=Val(1), wind::Tuple{Float64,Float64}=(0.0, 0.0))
+        # NOTE: deprecated TwoDGrid path (issue #43); `wind` accepted for signature compatibility
+        # with the MeshGrids method but unused here (this path deposits additively at order 1).
         # NOTE: TwoDGrid is deprecated (issue #43); higher-order B-spline deposition is only
         # supported on the live MeshGrids/CartesianGrid path. `spline` is accepted for dispatch
         # compatibility but ignored here — this path always deposits at order 1 (CIC).
@@ -70,7 +72,7 @@ function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGr
         nothing
 end
 
-function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::MeshGrids, periodic_boundary::Bool, spline::Val{P}=Val(1)) where {P}
+function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::MeshGrids, periodic_boundary::Bool, spline::Val{P}=Val(1), wind::Tuple{Float64,Float64}=(0.0, 0.0)) where {P}
 
         #u[4], u[5] are the x and y positions of the particle. For the CartesianGrid2D these are cooridnates relative to the particle node
         weights_and_index = PIC.compute_weights_and_index_mininal(PI.position_ij, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5], spline)
@@ -81,8 +83,9 @@ function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::MeshGr
         u_state = GetParticleEnergyMomentum(PI.ODEIntegrator.u)
         #@show u_state
 
-        #PIC.push_to_grid!(S, u_state , index_positions,  weights, G.Nx, G.Ny , periodic_boundary)
-        PIC.push_to_grid!(S, u_state, weights_and_index, G.stats.Nx, G.stats.Ny)
+        # `wind` is the local (u,v) at the particle; it drives the wind-sea-aware merge! contest
+        # at each stencil node (so opposing groups do not additively cancel their momentum).
+        PIC.push_to_grid!(S, u_state, weights_and_index, G.stats.Nx, G.stats.Ny, wind)
         nothing
 end
 
@@ -190,6 +193,7 @@ function advance!(PI::AbstractParticleInstance,
                         periodic_boundary::Bool,
                         default_particle::PP,
                         spline::Val{P}=Val(1),
+                        windsea_merge::Bool=false,
                         ) where {PP<:Union{ParticleDefaults,Nothing},FF<:Union{ForcingCollection,ForcingData,NamedTuple{(:u, :v)},Tuple{Float64,Float64}},P}
         #@show PI.position_ij
 
@@ -284,7 +288,10 @@ function advance!(PI::AbstractParticleInstance,
 
         #if PI.ODEIntegrator.u[1] > -13.0 #ODEs.log_energy_minimum # the minimum enerçy is distributed to 4 neighbouring particles
         if PI.on
-                ParticleToNode!(PI, S, Grid, periodic_boundary, spline)
+                # windsea_merge=true forwards the local wind so the deposit runs the wind-sea
+                # merge! contest; false forwards zero wind, for which merge! == additive deposit.
+                merge_wind = windsea_merge ? winds_i_local : (0.0, 0.0)
+                ParticleToNode!(PI, S, Grid, periodic_boundary, spline, merge_wind)
         end
 
         return PI
