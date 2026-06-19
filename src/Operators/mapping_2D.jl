@@ -328,7 +328,17 @@ function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
 
         # minimal_state[1] is the minimal Energy
         # minimal_state[2] is the minimal momentum squared
-        m_amp_min = ODEs.m_amp_minimum
+        #
+        # Reconstruction floor on |m|. ODEs.m_amp_minimum is the absolute crash floor
+        # (guards the c = m·e/(2|m|²) division, #63). When ODEs.windsea_alpha > 0 the floor
+        # is raised to a local, wind-sea-aware level: α · |m| of a fully developed PM sea at
+        # the local wind speed (FetchRelations.windsea_momentum_PM ∝ U³). This discards the
+        # tiny, ill-defined net momentum that drives the #64 remesh limit cycle at wind/calm
+        # interfaces, while scaling with the wind so it never over-deactivates an energetic
+        # wind sea. α is tunable (PM is fully developed → an upper bound, so α is small).
+        m_amp_min = ODEs.windsea_alpha > 0 ?
+                max(ODEs.m_amp_minimum, ODEs.windsea_alpha * FetchRelations.windsea_momentum_PM(sqrt(wind_speed_squared))) :
+                ODEs.m_amp_minimum
         m_amp    = speed(u_state[2], u_state[3])
 
         if ~PI.boundary & (u_state[1] >= minimal_state[1]) & (speed_square(u_state[1], u_state[2]) >= minimal_state[2])

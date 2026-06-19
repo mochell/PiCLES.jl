@@ -124,8 +124,10 @@ $(DocStringExtensions.FIELDS)
 
     "minimum needed squared wind velocity to seed particle"
     wind_min_squared::Float64 = 4.0
-    "minimum momentum amplitude for vertex reconstruction; below this threshold the direction is ill-defined"
+    "minimum momentum amplitude for vertex reconstruction (crash floor); below this threshold the direction is ill-defined"
     m_amp_minimum::Float64 = 1e-6
+    "wind-sea scaling of the reconstruction floor: local threshold = max(m_amp_minimum, windsea_alpha · |m|_ws,PM(U_local)). 0 disables the local scaling (constant m_amp_minimum)."
+    windsea_alpha::Float64 = 0.0
     "solver method for ODE system"
     #alternatives
     #Rosenbrock23(), AutoVern7(Rodas4()) ,AutoTsit5(Rosenbrock23()) , Tsit5()
