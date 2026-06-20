@@ -2,6 +2,7 @@ module ParticleInCell
 
 using ..Architectures: StateTypeL1, AbstractBoundary
 using Statistics
+using LinearAlgebra: norm
 
 using SharedArrays
 using StaticArrays
@@ -304,7 +305,7 @@ function merge!(grid_point::Vector{Float64}, charge::Vector{Float64}; verbose=fa
         cosθ = 1
     else
         # calculate angle between both
-        cosθ = grid_point[2] * charge[2] + grid_point[3] * grid_point[3] / (norm(grid_point[2:3]) * norm(charge[2:3]))
+        cosθ = (grid_point[2] * charge[2] + grid_point[3] * charge[3]) / (norm(grid_point[2:3]) * norm(charge[2:3]))
     end
 
     if (cosθ >= 0.5)
@@ -318,6 +319,59 @@ function merge!(grid_point::Vector{Float64}, charge::Vector{Float64}; verbose=fa
     end
     return grid_point
 
+end
+
+# Hanson & Phillips (2001) wind-sea wave-age factor (their Eq. 4 uses 1.5). The deep-water
+# relations c_p = 2 c_g and c_g = e / (2|m|) make the criterion c_p <= 1.5 U10 cosδ collapse
+# to  e <= 1.5 (wind · m)  with (wind · m) > 0, i.e. no divisions or trig needed.
+const WINDSEA_AGE_FACTOR = 1.5
+
+"""
+    _is_windsea(state, wind; factor=WINDSEA_AGE_FACTOR)
+
+True if a node/charge state `[e, m_x, m_y]` is wind sea under the Hanson & Phillips (2001)
+wave-age criterion for the local `wind = (u, v)`: the wave must travel with the wind
+(positive projection) and be young enough (`e <= factor * wind·m`).
+"""
+@inline function _is_windsea(state, wind::Tuple{Float64,Float64}; factor::Float64=WINDSEA_AGE_FACTOR)
+    proj = wind[1] * state[2] + wind[2] * state[3]      # = U10 cosδ · |m|  (wind projected on wave dir)
+    return proj > 0.0 && state[1] <= factor * proj
+end
+
+# V2: angle + Hanson&Phillips wave-age — wind-sea favoured over crossing swell.
+# Used by the 2D MeshGrid deposition. Aligned groups (<60° apart) add as before. For opposing
+# groups (>60°) only the wind-sea/swell *cross* cases pick a winner — a wind-sea charge
+# overrides a non-wind-sea node and vice versa — so a developing wind sea is not corrupted by a
+# crossing swell. When both are wind sea, or both are swell, they still add: this lets swell
+# propagate through weak-wind regions and lets a same-system wind sea build up.
+#
+# NOTE (future, out of scope): the dropped "losing" charge should eventually be re-homed into a
+# separate PiCLES particle layer rather than discarded. For now it is deleted, matching the
+# Hanson & Phillips partitioning ("survival of the fittest").
+function merge!(grid_point::AbstractVector{Float64}, charge::AbstractVector{Float64}, wind::Tuple{Float64,Float64}; verbose=false)
+    if norm(grid_point[2:3]) == 0 || norm(charge[2:3]) == 0
+        # empty node (or zero-momentum charge): nothing to contest, just accumulate
+        return grid_point + charge
+    end
+    cosθ = (grid_point[2] * charge[2] + grid_point[3] * charge[3]) / (norm(grid_point[2:3]) * norm(charge[2:3]))
+    if cosθ >= 0.5
+        verbose ? (@info "within 60°: same system, add") : nothing
+        return grid_point + charge
+    end
+    # opposing systems (>60° apart): only the wind-sea/swell cross cases select a winner
+    charge_ws = _is_windsea(charge, wind)
+    grid_ws   = _is_windsea(grid_point, wind)
+    if charge_ws && !grid_ws
+        verbose ? (@info "opposed: charge is wind sea, grid is not -> replace") : nothing
+        return convert(typeof(grid_point), charge)
+    elseif grid_ws && !charge_ws
+        verbose ? (@info "opposed: grid is wind sea, charge is not -> drop charge") : nothing
+        return grid_point
+    else
+        # both wind sea or both swell: add (swell propagation / wind-sea build-up)
+        verbose ? (@info "opposed: same wind-sea status -> add") : nothing
+        return grid_point + charge
+    end
 end
 
 # V0 : Who is larger
@@ -405,13 +459,18 @@ function push_to_grid!(grid::StateTypeL1,
 
 end
 
-# Abstract Boundary Version
+# Abstract Boundary Version.
+# `wind` is the local (u, v) at the depositing particle, used by the wind-sea-aware merge! rule
+# so opposing wave groups contest instead of additively cancelling their momentum. Default
+# (0,0) reproduces the previous additive behaviour (every state is then classified non-wind-sea
+# and same-type groups still add, so a zero wind never drops a charge).
 function push_to_grid!(grid::StateTypeL1,
                             charge::CC,
                             index_pos::II,
                             weights::WW,
-                            Nx::AbstractBoundary, 
-                            Ny::AbstractBoundary) where {CC<:Union{Vector{Float64},SVector{3,Float64},MVector{3,AbstractFloat}},
+                            Nx::AbstractBoundary,
+                            Ny::AbstractBoundary,
+                            wind::Tuple{Float64,Float64}=(0.0, 0.0)) where {CC<:Union{Vector{Float64},SVector{3,Float64},MVector{3,AbstractFloat}},
                                                             II<:Union{Tuple{Int,Int},SVector{2,Int64}},
                                                             WW<:Tuple{Float64,Float64}}
 
@@ -431,13 +490,15 @@ function push_to_grid!(grid::StateTypeL1,
             @error e, index_pos, charge, Nx, Ny
             return
         end
-        grid[index_pos[1], index_pos[2], :] += weights[1] * weights[2] * charge
+        ipx, ipy = index_pos[1], index_pos[2]
+        grid[ipx, ipy, :] = merge!(grid[ipx, ipy, :], weights[1] * weights[2] * charge, wind)
 
     else # all other boundaries
 
         # @info index_pos, " particle is in domain, wrap if needed"
-        #@info wrap_index!(PI.position_ij[1], G.stats.Nx), wrap_index!(PI.position_ij[2], G.stats.Ny)
-        grid[wrap_index!(index_pos[1], Nx), wrap_index!(index_pos[2], Ny), :] += weights[1] * weights[2] * charge
+        ipx = wrap_index!(index_pos[1], Nx)
+        ipy = wrap_index!(index_pos[2], Ny)
+        grid[ipx, ipy, :] = merge!(grid[ipx, ipy, :], weights[1] * weights[2] * charge, wind)
 
     end
     nothing
@@ -606,10 +667,12 @@ wrapper over FieldVector weight&index (wni),
 function push_to_grid!(grid::StateTypeL1,
     charge::CC,
     weights_and_index::wni,
-    Nx::AbstractBoundary, Ny::AbstractBoundary) where {CC<:Union{Vector{Float64},SVector{3,Float64}}}
+    Nx::AbstractBoundary, Ny::AbstractBoundary,
+    wind::Tuple{Float64,Float64}=(0.0, 0.0)) where {CC<:Union{Vector{Float64},SVector{3,Float64}}}
     #@info "this is version D"
+    # the wind-sea/swell contest (merge!) is applied at every B-spline stencil node
     for (i, w) in construct_loop(weights_and_index)
-        push_to_grid!(grid, charge, i, w, Nx, Ny)
+        push_to_grid!(grid, charge, i, w, Nx, Ny, wind)
     end
 end
 

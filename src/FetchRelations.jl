@@ -622,4 +622,29 @@ function PMlimits()
 end
 
 
+"""
+    windsea_momentum_PM(U; g=9.81)
+
+Momentum amplitude |m| of a *fully developed* Pierson–Moskowitz wind sea for a 10 m wind
+speed `U` (m/s). This is the closed form of the `"PM"` branch of `get_initial_windsea`:
+with Hs = 0.0246·U², E = (Hs/4)², f_peak = 0.816·g/(2π·U), T̄ = 0.9/f_peak,
+c̄g = g·T̄/(4π) and |m| = E/(2·c̄g), the U-dependence collapses to |m|_ws,PM(U) ∝ U³
+(≈ 3.43e-5·U³). Allocation-free (no dict), so it can be evaluated per-node in `remesh!`.
+
+Used to scale a local, wind-sea-aware `m_amp_minimum` reconstruction floor:
+`threshold = max(m_amp_minimum, α · windsea_momentum_PM(U_local))`. Because PM is fully
+developed, this is an *upper bound* on the local wind-sea momentum (a young/fetch-limited
+sea carries less), so the tunable coefficient α is correspondingly small.
+"""
+@inline function windsea_momentum_PM(U::Number; g::Float64=9.81)
+    Ua = abs(U)
+    Ua == 0 && return 0.0
+    Hs = 0.0246 * Ua^2
+    E  = (Hs / 4)^2
+    f_peak = 0.816 * g / (2 * pi * Ua)
+    cg = g * (0.9 / f_peak) / (4 * pi)         # c̄g = g·T̄/(4π), T̄ = 0.9/f_peak
+    return E / (2 * cg)
+end
+
+
 end

@@ -258,6 +258,11 @@ end
 
 function time_step!_advance(model::Abstract2DModel, Δt::Float64, forcing_xy, FailedCollection::Vector{AbstractMarkedParticleInstance}, spline::Val{P}=Val(1)) where {P}
 
+    # node deposition rule: additive (default) or wind-sea-favoured merge! contest. The flag is
+    # passed down so advance! either forwards the local wind to the merge (contest active) or a
+    # zero wind, for which merge! reduces exactly to additive deposition.
+    windsea_merge = hasproperty(model, :windsea_merge) ? model.windsea_merge : false
+
     @threads for a_particle in model.ParticleCollection[model.ocean_points]
         #@info a_particle.position_ij
         particle_on = a_particle.on
@@ -274,7 +279,7 @@ function time_step!_advance(model::Abstract2DModel, Δt::Float64, forcing_xy, Fa
                 model.ODEsettings.wind_min_squared,
                 model.periodic_boundary,
                 model.ODEdefaults,
-                spline)
+                spline, windsea_merge)
 
         # if (a_particle.position_ij[2] == 6) & (particle_on != a_particle.on)            
         #     @info "after advance! outside: $(a_particle.position_ij) particle on change :$(particle_on) to $(a_particle.on)"
