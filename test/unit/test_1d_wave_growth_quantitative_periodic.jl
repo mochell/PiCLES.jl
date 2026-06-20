@@ -135,11 +135,6 @@ end
             picles_data = get_fetch_variables_from_model_output(data_periodic_slice, odepars.r_g)
             nd = get_non_dim_data(picles_data, u10, out.x, out.time)
 
-            let E = nd.E_tilde[(MONO_SKIP_STEPS+1):end], Fp = nd.Fp_tilde[(MONO_SKIP_STEPS+1):end]
-                dE = diff(E) ./ maximum(abs, E)
-                dFp = diff(Fp) ./ maximum(abs, Fp)
-                @info "MONO-DIAG case $(i) P=$(P)" min_reldiff_E=minimum(dE) argmin_E=argmin(dE) len_E=length(E) max_reldiff_Fp=maximum(dFp)
-            end
             @testset "case $(i): u10=$(u10), DT=$(DT), Nx=$(Nx)" begin
                 @test is_monotonic_increasing(nd.E_tilde)
                 @test is_monotonic_decreasing(nd.Fp_tilde)
