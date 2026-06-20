@@ -52,8 +52,10 @@ S       Shared array where particles are stored
 G       (TwoDGrid) Grid that defines the nodepositions
 """
 
-function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGrid, periodic_boundary::Bool)
-
+function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGrid, periodic_boundary::Bool, spline::Val=Val(1))
+        # NOTE: TwoDGrid is deprecated (issue #43); higher-order B-spline deposition is only
+        # supported on the live MeshGrids/CartesianGrid path. `spline` is accepted for dispatch
+        # compatibility but ignored here — this path always deposits at order 1 (CIC).
         #u[4], u[5] are the x and y positions of the particle
         #index_positions, weights = PIC.compute_weights_and_index(G, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5])
         weights_and_index = PIC.compute_weights_and_index_mininal(G, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5])
@@ -68,10 +70,10 @@ function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGr
         nothing
 end
 
-function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::MeshGrids, periodic_boundary::Bool)
-        
+function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::MeshGrids, periodic_boundary::Bool, spline::Val{P}=Val(1)) where {P}
+
         #u[4], u[5] are the x and y positions of the particle. For the CartesianGrid2D these are cooridnates relative to the particle node
-        weights_and_index = PIC.compute_weights_and_index_mininal(PI.position_ij, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5])
+        weights_and_index = PIC.compute_weights_and_index_mininal(PI.position_ij, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5], spline)
         # @info PI.position_ij, weights_and_index
 
         #ui[1:2] .= PI.position_xy
@@ -185,9 +187,10 @@ function advance!(PI::AbstractParticleInstance,
                         DT::Float64, 
                         log_energy_maximum::Float64,
                         wind_min_squared::Float64,
-                        periodic_boundary::Bool, 
+                        periodic_boundary::Bool,
                         default_particle::PP,
-                        ) where {PP<:Union{ParticleDefaults,Nothing},FF<:Union{ForcingCollection,ForcingData,NamedTuple{(:u, :v)},Tuple{Float64,Float64}}}
+                        spline::Val{P}=Val(1),
+                        ) where {PP<:Union{ParticleDefaults,Nothing},FF<:Union{ForcingCollection,ForcingData,NamedTuple{(:u, :v)},Tuple{Float64,Float64}},P}
         #@show PI.position_ij
 
         #if ~PI.boundary # if point is not a 
@@ -280,8 +283,8 @@ function advance!(PI::AbstractParticleInstance,
         end
 
         #if PI.ODEIntegrator.u[1] > -13.0 #ODEs.log_energy_minimum # the minimum enerçy is distributed to 4 neighbouring particles
-        if PI.on 
-                ParticleToNode!(PI, S, Grid, periodic_boundary)
+        if PI.on
+                ParticleToNode!(PI, S, Grid, periodic_boundary, spline)
         end
 
         return PI

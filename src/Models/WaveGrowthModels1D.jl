@@ -50,7 +50,8 @@ function WaveGrowth1D(; grid::CartesianGridMesh1D,
     currents=nothing,
     periodic_boundary=true,
     boundary_type="same",
-    CBsets=nothing)
+    CBsets=nothing,
+    spline_order::Int=1)
 
     return WaveGrowth2D(;
         grid=grid,
@@ -65,7 +66,8 @@ function WaveGrowth1D(; grid::CartesianGridMesh1D,
         currents=currents,
         periodic_boundary=periodic_boundary,
         boundary_type=boundary_type,
-        CBsets=CBsets)
+        CBsets=CBsets,
+        spline_order=spline_order)
 end
 
 # end of module

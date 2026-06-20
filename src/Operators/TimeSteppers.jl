@@ -202,7 +202,11 @@ function time_step!(model::Abstract2DModel, Δt::Float64; forcing=nothing, callb
         @show model.ParticleCollection[:, 6].on
     end 
 
-    time_step!_advance(model, Δt, forcing_xy, FailedCollection)
+    # Resolve the B-spline deposition order Int -> Val{P} ONCE here (function barrier). Below this
+    # point everything specializes on Val{P} and compiles once per order (cached across steps);
+    # the only per-step cost is this single dispatch. See issues #59/#60.
+    spline_val = Val(hasproperty(model, :spline_order) ? model.spline_order : 1)
+    time_step!_advance(model, Δt, forcing_xy, FailedCollection, spline_val)
     # @threads for a_particle in model.ParticleCollection[model.ocean_points]
     #     #@info a_particle.position_ij
     #     mapping_2D.advance!(    a_particle, model.State, FailedCollection,
@@ -252,7 +256,7 @@ function time_step!(model::Abstract2DModel, Δt::Float64; forcing=nothing, callb
 
 end
 
-function time_step!_advance(model::Abstract2DModel, Δt::Float64, forcing_xy, FailedCollection::Vector{AbstractMarkedParticleInstance})
+function time_step!_advance(model::Abstract2DModel, Δt::Float64, forcing_xy, FailedCollection::Vector{AbstractMarkedParticleInstance}, spline::Val{P}=Val(1)) where {P}
 
     @threads for a_particle in model.ParticleCollection[model.ocean_points]
         #@info a_particle.position_ij
@@ -269,7 +273,8 @@ function time_step!_advance(model::Abstract2DModel, Δt::Float64, forcing_xy, Fa
                 model.ODEsettings.log_energy_maximum,
                 model.ODEsettings.wind_min_squared,
                 model.periodic_boundary,
-                model.ODEdefaults)
+                model.ODEdefaults,
+                spline)
 
         # if (a_particle.position_ij[2] == 6) & (particle_on != a_particle.on)            
         #     @info "after advance! outside: $(a_particle.position_ij) particle on change :$(particle_on) to $(a_particle.on)"
@@ -327,7 +332,9 @@ function movie_time_step!(model::Abstract2DModel, Δt; forcing=nothing, callback
     current_forcing === nothing && error("2D movie_time_step! requires forcing data (pass `forcing=...` to Simulation or set `model.winds`)")
     forcing_xy = time_slice_forcing(current_forcing, model.grid, model.clock.time)
 
-    time_step!_advance(model, Δt, forcing_xy, FailedCollection)
+    # resolve B-spline deposition order Int -> Val{P} once (function barrier); see time_step!
+    spline_val = Val(hasproperty(model, :spline_order) ? model.spline_order : 1)
+    time_step!_advance(model, Δt, forcing_xy, FailedCollection, spline_val)
 
     model.MovieState = copy(model.State)
 
