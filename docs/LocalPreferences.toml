@@ -1,0 +1,9 @@
+# Disable Plots' `@compile_workload` precompile block for the docs build.
+#
+# Plots' example-gallery precompile workload throws a `floatrange` MethodError on
+# Linux x86_64 (CI) under Julia 1.10.11, which aborts precompilation of PiCLES
+# (loaded by docs/make.jl). The workload only warms up first-call latency, so
+# skipping it is safe. Plots is named in docs/Project.toml [extras] so this entry
+# resolves at precompile time.
+[Plots]
+precompile_workload = false

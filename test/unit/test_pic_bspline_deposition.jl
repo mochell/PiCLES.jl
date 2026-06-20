@@ -19,7 +19,13 @@ using PiCLES.custom_structures: N_Periodic
 
 @testset "B-spline deposition kernels" begin
 
-    zs = collect(range(-7.3, 9.7, length=137))
+    # Keep this grid construction independent of Base.floatrange internals so it works
+    # across Julia versions used in CI.
+    z0 = -7.3
+    z1 = 9.7
+    Nz = 137
+    dz = (z1 - z0) / (Nz - 1)
+    zs = [z0 + (k - 1) * dz for k in 1:Nz]
 
     @testset "partition of unity (absolute + relative), P=$(P)" for P in (1, 2, 3)
         for z in zs
