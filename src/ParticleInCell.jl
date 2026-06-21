@@ -2,6 +2,7 @@ module ParticleInCell
 
 using ..Architectures: StateTypeL1, AbstractBoundary
 using Statistics
+using LinearAlgebra: norm
 
 using SharedArrays
 using StaticArrays
@@ -88,9 +89,65 @@ function get_relative_i_and_w(zp_normed::Float64)
 end
 
 
+# ---------------------- B-spline deposition kernels ------------------
+# Generalize the linear (CIC, order 1) weighting above to arbitrary B-spline order P = 1, 2, 3,
+# selectable at model setup, to reduce grid-imprint anisotropy (see issues #59, #60).
+#
+# Centering convention (standard PIC, required for partition of unity Σw = 1):
+#   - odd order  (P = 1, 3): stencil centered on floor(z)
+#   - even order (P = 2):    stencil centered on round(z) (nearest node)
+# Stencil width is N = P + 1. Weights sum to 1 at every order, so the additive deposit conserves
+# total charge/energy exactly regardless of P.
+#
+# Two entry points mirror the linear functions above and keep P = 1 byte-identical:
+#   - get_absolute_i_and_w(z, ::Val{P})           absolute indices, δ = z - center (no rounding)
+#   - get_absolute_i_and_w(z, i_node, ::Val{P})   indices relative to particle node, δ rounded to 6 digits
+
+@inline _bspline_center(z::Float64, ::Val{1}) = floor(z)
+@inline _bspline_center(z::Float64, ::Val{2}) = round(z)
+@inline _bspline_center(z::Float64, ::Val{3}) = floor(z)
+
+@inline _bspline_offsets(::Val{1}) = SVector{2,Int64}(0, 1)
+@inline _bspline_offsets(::Val{2}) = SVector{3,Int64}(-1, 0, 1)
+@inline _bspline_offsets(::Val{3}) = SVector{4,Int64}(-1, 0, 1, 2)
+
+@inline _bspline_weights(δ::Float64, ::Val{1}) = SVector{2,Float64}(1.0 - δ, δ)
+@inline _bspline_weights(δ::Float64, ::Val{2}) =
+    SVector{3,Float64}(0.5 * (0.5 - δ)^2, 0.75 - δ^2, 0.5 * (0.5 + δ)^2)
+@inline function _bspline_weights(δ::Float64, ::Val{3})
+    ω = 1.0 / 6.0
+    return SVector{4,Float64}(ω * (1 - δ)^3, ω * (3δ^3 - 6δ^2 + 4), ω * (-3δ^3 + 3δ^2 + 3δ + 1), ω * δ^3)
+end
 
 """
-norm_distance(xp::T, xmin::T, dx::T) 
+get_absolute_i_and_w(zp_normed::Float64, spline::Val{P})
+B-spline generalization of the absolute-index variant. For P = 1 returns the same indices and
+weights as `get_absolute_i_and_w(zp_normed)`.
+"""
+@inline function get_absolute_i_and_w(zp_normed::Float64, spline::Val{P}) where {P}
+    center = _bspline_center(zp_normed, spline)
+    δ = zp_normed - center
+    i0 = Int(center) + 1
+    return i0 .+ _bspline_offsets(spline), _bspline_weights(δ, spline)
+end
+
+"""
+get_absolute_i_and_w(zp_normed::Float64, i_node::Int64, spline::Val{P})
+B-spline generalization of the particle-node-relative variant (used by MeshGrids/CartesianGrid).
+For P = 1 returns the same indices and weights as `get_absolute_i_and_w(zp_normed, i_node)`,
+including the `round(..., digits=6)` on the fractional offset.
+"""
+@inline function get_absolute_i_and_w(zp_normed::Float64, i_node::Int64, spline::Val{P}) where {P}
+    center = _bspline_center(zp_normed, spline)
+    δ = round(zp_normed - center, digits=6)
+    i0 = Int(center) + i_node
+    return i0 .+ _bspline_offsets(spline), _bspline_weights(δ, spline)
+end
+
+
+
+"""
+norm_distance(xp::T, xmin::T, dx::T)
 returns normalized distance
 """
 function norm_distance(xp::T, xmin::T, dx::T) where {T<:AbstractFloat}
@@ -152,6 +209,18 @@ function compute_weights_and_index_mininal(ij::II, xp::Float64, yp::Float64) whe
     """
     xi, xw = get_absolute_i_and_w(xp, ij[1])
     yi, yw = get_absolute_i_and_w(yp, ij[2])
+
+    return wni(xi, xw, yi, yw)
+end
+
+"""
+compute_weights_and_index_mininal(ij, xp, yp, spline::Val{P})
+B-spline (order P) variant of the particle-node-relative 2D wrapper. Returns a `wni{P+1}`.
+`spline = Val(1)` is bit-identical to the 3-argument method above.
+"""
+function compute_weights_and_index_mininal(ij::II, xp::Float64, yp::Float64, spline::Val{P}) where {II<:Union{Tuple{Int,Int},CartesianIndex},P}
+    xi, xw = get_absolute_i_and_w(xp, ij[1], spline)
+    yi, yw = get_absolute_i_and_w(yp, ij[2], spline)
 
     return wni(xi, xw, yi, yw)
 end
@@ -236,7 +305,7 @@ function merge!(grid_point::Vector{Float64}, charge::Vector{Float64}; verbose=fa
         cosθ = 1
     else
         # calculate angle between both
-        cosθ = grid_point[2] * charge[2] + grid_point[3] * grid_point[3] / (norm(grid_point[2:3]) * norm(charge[2:3]))
+        cosθ = (grid_point[2] * charge[2] + grid_point[3] * charge[3]) / (norm(grid_point[2:3]) * norm(charge[2:3]))
     end
 
     if (cosθ >= 0.5)
@@ -250,6 +319,59 @@ function merge!(grid_point::Vector{Float64}, charge::Vector{Float64}; verbose=fa
     end
     return grid_point
 
+end
+
+# Hanson & Phillips (2001) wind-sea wave-age factor (their Eq. 4 uses 1.5). The deep-water
+# relations c_p = 2 c_g and c_g = e / (2|m|) make the criterion c_p <= 1.5 U10 cosδ collapse
+# to  e <= 1.5 (wind · m)  with (wind · m) > 0, i.e. no divisions or trig needed.
+const WINDSEA_AGE_FACTOR = 1.5
+
+"""
+    _is_windsea(state, wind; factor=WINDSEA_AGE_FACTOR)
+
+True if a node/charge state `[e, m_x, m_y]` is wind sea under the Hanson & Phillips (2001)
+wave-age criterion for the local `wind = (u, v)`: the wave must travel with the wind
+(positive projection) and be young enough (`e <= factor * wind·m`).
+"""
+@inline function _is_windsea(state, wind::Tuple{Float64,Float64}; factor::Float64=WINDSEA_AGE_FACTOR)
+    proj = wind[1] * state[2] + wind[2] * state[3]      # = U10 cosδ · |m|  (wind projected on wave dir)
+    return proj > 0.0 && state[1] <= factor * proj
+end
+
+# V2: angle + Hanson&Phillips wave-age — wind-sea favoured over crossing swell.
+# Used by the 2D MeshGrid deposition. Aligned groups (<60° apart) add as before. For opposing
+# groups (>60°) only the wind-sea/swell *cross* cases pick a winner — a wind-sea charge
+# overrides a non-wind-sea node and vice versa — so a developing wind sea is not corrupted by a
+# crossing swell. When both are wind sea, or both are swell, they still add: this lets swell
+# propagate through weak-wind regions and lets a same-system wind sea build up.
+#
+# NOTE (future, out of scope): the dropped "losing" charge should eventually be re-homed into a
+# separate PiCLES particle layer rather than discarded. For now it is deleted, matching the
+# Hanson & Phillips partitioning ("survival of the fittest").
+function merge!(grid_point::AbstractVector{Float64}, charge::AbstractVector{Float64}, wind::Tuple{Float64,Float64}; verbose=false)
+    if norm(grid_point[2:3]) == 0 || norm(charge[2:3]) == 0
+        # empty node (or zero-momentum charge): nothing to contest, just accumulate
+        return grid_point + charge
+    end
+    cosθ = (grid_point[2] * charge[2] + grid_point[3] * charge[3]) / (norm(grid_point[2:3]) * norm(charge[2:3]))
+    if cosθ >= 0.5
+        verbose ? (@info "within 60°: same system, add") : nothing
+        return grid_point + charge
+    end
+    # opposing systems (>60° apart): only the wind-sea/swell cross cases select a winner
+    charge_ws = _is_windsea(charge, wind)
+    grid_ws   = _is_windsea(grid_point, wind)
+    if charge_ws && !grid_ws
+        verbose ? (@info "opposed: charge is wind sea, grid is not -> replace") : nothing
+        return convert(typeof(grid_point), charge)
+    elseif grid_ws && !charge_ws
+        verbose ? (@info "opposed: grid is wind sea, charge is not -> drop charge") : nothing
+        return grid_point
+    else
+        # both wind sea or both swell: add (swell propagation / wind-sea build-up)
+        verbose ? (@info "opposed: same wind-sea status -> add") : nothing
+        return grid_point + charge
+    end
 end
 
 # V0 : Who is larger
@@ -322,7 +444,7 @@ function push_to_grid!(grid::StateTypeL1,
                             Nx::Int, Ny::Int,
                             periodic::Bool=true) where {CC<:Union{Vector{Float64},SVector{3,Float64},MVector{3,AbstractFloat}},
                                                             II<:Union{Tuple{Int,Int},SVector{2,Int64}},
-                                                            WW<:Union{Tuple{Float64,Float64},SVector{2,Float16}}}
+                                                            WW<:Tuple{Float64,Float64}}
     if periodic
         grid[ wrap_index!(index_pos[1], Nx) , wrap_index!(index_pos[2], Ny), : ] += weights[1] * weights[2] * charge
     else
@@ -337,15 +459,20 @@ function push_to_grid!(grid::StateTypeL1,
 
 end
 
-# Abstract Boundary Version
+# Abstract Boundary Version.
+# `wind` is the local (u, v) at the depositing particle, used by the wind-sea-aware merge! rule
+# so opposing wave groups contest instead of additively cancelling their momentum. Default
+# (0,0) reproduces the previous additive behaviour (every state is then classified non-wind-sea
+# and same-type groups still add, so a zero wind never drops a charge).
 function push_to_grid!(grid::StateTypeL1,
                             charge::CC,
                             index_pos::II,
                             weights::WW,
-                            Nx::AbstractBoundary, 
-                            Ny::AbstractBoundary) where {CC<:Union{Vector{Float64},SVector{3,Float64},MVector{3,AbstractFloat}},
+                            Nx::AbstractBoundary,
+                            Ny::AbstractBoundary,
+                            wind::Tuple{Float64,Float64}=(0.0, 0.0)) where {CC<:Union{Vector{Float64},SVector{3,Float64},MVector{3,AbstractFloat}},
                                                             II<:Union{Tuple{Int,Int},SVector{2,Int64}},
-                                                            WW<:Union{Tuple{Float64,Float64},SVector{2,Float16}}}
+                                                            WW<:Tuple{Float64,Float64}}
 
     # conditions where nothing should be returned
     if  (Nx isa N_NonPeriodic) & ~test_domain(index_pos[1], Nx.N) | # non-periodic in x and y-position is out of domain
@@ -363,13 +490,15 @@ function push_to_grid!(grid::StateTypeL1,
             @error e, index_pos, charge, Nx, Ny
             return
         end
-        grid[index_pos[1], index_pos[2], :] += weights[1] * weights[2] * charge
+        ipx, ipy = index_pos[1], index_pos[2]
+        grid[ipx, ipy, :] = merge!(grid[ipx, ipy, :], weights[1] * weights[2] * charge, wind)
 
     else # all other boundaries
 
         # @info index_pos, " particle is in domain, wrap if needed"
-        #@info wrap_index!(PI.position_ij[1], G.stats.Nx), wrap_index!(PI.position_ij[2], G.stats.Ny)
-        grid[wrap_index!(index_pos[1], Nx), wrap_index!(index_pos[2], Ny), :] += weights[1] * weights[2] * charge
+        ipx = wrap_index!(index_pos[1], Nx)
+        ipy = wrap_index!(index_pos[2], Ny)
+        grid[ipx, ipy, :] = merge!(grid[ipx, ipy, :], weights[1] * weights[2] * charge, wind)
 
     end
     nothing
@@ -501,10 +630,18 @@ function construct_loop(wni::FieldVector{4,SVector})
 #     return zip(idx, wtx)
 # end
 
-function construct_loop(wni::FieldVector{4,SVector})
-    idx = SVector{4,Tuple{Int,Int}}(                    (wni.xi[1], wni.yi[1]), (wni.xi[2], wni.yi[1]), (wni.xi[1], wni.yi[2]), (wni.xi[2], wni.yi[2]))
-    wtx = SVector{4,Tuple{AbstractFloat,AbstractFloat}}((wni.xw[1], wni.yw[1]), (wni.xw[2], wni.yw[1]), (wni.xw[1], wni.yw[2]), (wni.xw[2], wni.yw[2]))
-    return zip(idx, wtx)
+"""
+construct_loop(w::wni{N})
+Builds the full N×N separable stencil (N = spline order + 1) as a zip of (index, weight) pairs.
+Flatten is column-major (x fastest); for N = 2 this reproduces the original CIC ordering
+(x1,y1),(x2,y1),(x1,y2),(x2,y2) exactly. Weights are kept as the (xw, yw) 2-tuple so the
+single-point push_to_grid! arithmetic `weights[1]*weights[2]*charge` is unchanged.
+"""
+function construct_loop(w::wni{N}) where {N}
+    M = N * N
+    idx = ntuple(k -> (w.xi[(k - 1) % N + 1], w.yi[(k - 1) ÷ N + 1]), Val(M))
+    wtx = ntuple(k -> (w.xw[(k - 1) % N + 1], w.yw[(k - 1) ÷ N + 1]), Val(M))
+    return zip(SVector{M,Tuple{Int,Int}}(idx), SVector{M,Tuple{Float64,Float64}}(wtx))
 end
 
 
@@ -513,11 +650,11 @@ wrapper over FieldVector weight&index (wni),
 """
 function push_to_grid!(grid::StateTypeL1,
     charge::CC,
-    wni::FieldVector,
+    weights_and_index::wni,
     Nx::Int, Ny::Int,
     periodic::Bool=true) where CC <: Union{Vector{Float64}, SVector{3, Float64}}
     #@info "this is version D"
-    for (i, w) in construct_loop(wni)
+    for (i, w) in construct_loop(weights_and_index)
         push_to_grid!(grid, charge, i, w, Nx, Ny, periodic)
     end
 end
@@ -529,11 +666,13 @@ wrapper over FieldVector weight&index (wni),
 """
 function push_to_grid!(grid::StateTypeL1,
     charge::CC,
-    wni::FieldVector,
-    Nx::AbstractBoundary, Ny::AbstractBoundary) where {CC<:Union{Vector{Float64},SVector{3,Float64}}}
+    weights_and_index::wni,
+    Nx::AbstractBoundary, Ny::AbstractBoundary,
+    wind::Tuple{Float64,Float64}=(0.0, 0.0)) where {CC<:Union{Vector{Float64},SVector{3,Float64}}}
     #@info "this is version D"
-    for (i, w) in construct_loop(wni)
-        push_to_grid!(grid, charge, i, w, Nx, Ny)
+    # the wind-sea/swell contest (merge!) is applied at every B-spline stencil node
+    for (i, w) in construct_loop(weights_and_index)
+        push_to_grid!(grid, charge, i, w, Nx, Ny, wind)
     end
 end
 

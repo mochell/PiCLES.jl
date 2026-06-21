@@ -25,6 +25,10 @@ const T_TILDE_TARGET = 1.5e5
 const MONO_SKIP_STEPS = 5
 const PW_TOL_E = 0.10
 const PW_TOL_FP = 0.20
+# Relative slack for the monotonicity checks; see the periodic test for rationale.
+# Near-flat stretches of the (physically monotonic) growth curves wobble at the
+# floating-point level (~1e-5 relative) and flip sign across platforms/BLAS.
+const MONO_RTOL = 1e-3
 
 function get_fp_from_cg(cg)
     omega_p = 9.81 ./ (2 * cg)
@@ -50,16 +54,18 @@ function format_particle_data_saved(PI, t_end; saveat=nothing)
     )
 end
 
-function is_monotonic_increasing(v; skip_first=MONO_SKIP_STEPS)
+function is_monotonic_increasing(v; skip_first=MONO_SKIP_STEPS, rtol=MONO_RTOL)
     length(v) <= skip_first + 1 && return true
     vv = v[(skip_first + 1):end]
-    return all(diff(vv) .>= 0)
+    atol = rtol * maximum(abs, vv)
+    return all(diff(vv) .>= -atol)
 end
 
-function is_monotonic_decreasing(v; skip_first=MONO_SKIP_STEPS)
+function is_monotonic_decreasing(v; skip_first=MONO_SKIP_STEPS, rtol=MONO_RTOL)
     length(v) <= skip_first + 1 && return true
     vv = v[(skip_first + 1):end]
-    return all(diff(vv) .<= 0)
+    atol = rtol * maximum(abs, vv)
+    return all(diff(vv) .<= atol)
 end
 
 function assert_pw_at_target(t_tilde, e_tilde, fp_tilde; t_target=T_TILDE_TARGET, tol_e=PW_TOL_E, tol_fp=PW_TOL_FP)

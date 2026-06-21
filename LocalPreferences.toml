@@ -1,0 +1,10 @@
+# Disable Plots' `@compile_workload` precompile block.
+#
+# Plots' example-gallery precompile workload throws a `floatrange` MethodError on
+# Linux x86_64 (CI) under Julia 1.10.11, which aborts precompilation of the whole
+# PiCLES package (Plots is loaded via Utils/ParticleTools and visualization/Plotting).
+# The workload only warms up first-call latency, so skipping it is safe and unblocks
+# CI without affecting any results. PrecompileTools reads this at Plots precompile
+# time, and `Pkg.test` propagates it into the test sandbox (Plots is a direct dep).
+[Plots]
+precompile_workload = false

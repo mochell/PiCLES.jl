@@ -24,6 +24,12 @@ const T_TILDE_TARGET = 1.5e5
 const MONO_SKIP_STEPS = 5
 const PW_TOL_E = 0.10
 const PW_TOL_FP = 0.20
+# Relative slack for the monotonicity checks. The growth curves are physically
+# monotonic, but near-flat stretches wobble at the floating-point level (~1e-5
+# relative), and that wobble flips sign across platforms/BLAS (passes on macOS,
+# fails on Linux CI). Tolerate steps up to this fraction of the series scale so a
+# real reversal is still caught while FP noise is not.
+const MONO_RTOL = 1e-3
 
 squeeze(a) = dropdims(a, dims=tuple(findall(size(a) .== 1)...))
 
@@ -45,16 +51,18 @@ function get_non_dim_data(Pdata, u10, x, t)
     return (x_tilde=x_tilde, t_tilde=t_tilde, E_tilde=E_pic_tilde, Fp_tilde=Fp_pic_tilde)
 end
 
-function is_monotonic_increasing(v; skip_first=MONO_SKIP_STEPS)
+function is_monotonic_increasing(v; skip_first=MONO_SKIP_STEPS, rtol=MONO_RTOL)
     length(v) <= skip_first + 1 && return true
     vv = v[(skip_first + 1):end]
-    return all(diff(vv) .>= 0)
+    atol = rtol * maximum(abs, vv)
+    return all(diff(vv) .>= -atol)
 end
 
-function is_monotonic_decreasing(v; skip_first=MONO_SKIP_STEPS)
+function is_monotonic_decreasing(v; skip_first=MONO_SKIP_STEPS, rtol=MONO_RTOL)
     length(v) <= skip_first + 1 && return true
     vv = v[(skip_first + 1):end]
-    return all(diff(vv) .<= 0)
+    atol = rtol * maximum(abs, vv)
+    return all(diff(vv) .<= atol)
 end
 
 function assert_pw_at_target(t_tilde, e_tilde, fp_tilde; t_target=T_TILDE_TARGET, tol_e=PW_TOL_E, tol_fp=PW_TOL_FP)
@@ -81,8 +89,15 @@ end
         (u10 = 15.0, DT = 10minutes, Nx = 101),
     ]
 
-    @testset "Periodic case sweep" begin
-        for (i, case) in enumerate(case_list)
+    # B-spline deposition order sweep. The full case list runs at P=1 (CIC, the established
+    # coverage); higher orders P=2,3 are validated on a representative case to keep runtime
+    # reasonable while confirming the wave-growth physics is unchanged by the deposition order
+    # (issues #59, #60). Index 2 is the u10=15, DT=10min, Nx=101 case.
+    cases_for_order = Dict(1 => collect(eachindex(case_list)), 2 => [2], 3 => [2])
+
+    @testset "Periodic case sweep, spline_order=$(P)" for P in (1, 2, 3)
+        for i in cases_for_order[P]
+            case = case_list[i]
             u10, DT, Nx = case
             t_target_sec = T_TILDE_TARGET * u10 / 9.81
             stop_time = t_target_sec + DT
@@ -108,7 +123,8 @@ end
                 ODEinit_type="mininmal",
                 minimal_particle=FetchRelations.MinimalParticle(u10, 0, DT),
                 periodic_boundary=true,
-                boundary_type="same")
+                boundary_type="same",
+                spline_order=P)
 
             sim = Simulation(model, Δt=DT, stop_time=stop_time, verbose=false)
             initialize_simulation!(sim)

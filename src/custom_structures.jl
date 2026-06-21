@@ -60,13 +60,22 @@ Base.copy(s::ParticleInstance1D) = ParticleInstance1D(s.position_ij, s.position_
 Base.copy(s::ParticleInstance2D) = ParticleInstance2D(s.position_ij, s.position_xy, s.ODEIntegrator, s.boundary, s.on)
 
 # Regridding types:
-"""Weights & Index (wni) FieldVector """
-struct wni{TI<:SVector,TF<:SVector} <: FieldVector{4,SVector}
+"""
+Weights & Index (wni) for a separable N-point-per-axis deposition stencil (N = spline order + 1).
+`xi`/`yi` are the N integer node indices per axis, `xw`/`yw` the N B-spline weights per axis.
+N is encoded in the type so `construct_loop` unrolls the N^2 stencil per order.
+"""
+struct wni{N,TI<:SVector{N,Int64},TF<:SVector{N,Float64}}
         xi::TI
         xw::TF
         yi::TI
         yw::TF
 end
+
+# Explicit outer constructor so N is inferred from the stencil width (avoids relying on
+# static-parameter solving of N through the SVector{N,...} field constraints).
+wni(xi::SVector{N,Int64}, xw::SVector{N,Float64}, yi::SVector{N,Int64}, yw::SVector{N,Float64}) where {N} =
+        wni{N,SVector{N,Int64},SVector{N,Float64}}(xi, xw, yi, yw)
 
 # Define Boundary Types:
 

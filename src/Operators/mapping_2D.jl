@@ -52,8 +52,12 @@ S       Shared array where particles are stored
 G       (TwoDGrid) Grid that defines the nodepositions
 """
 
-function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGrid, periodic_boundary::Bool)
-
+function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGrid, periodic_boundary::Bool, spline::Val=Val(1), wind::Tuple{Float64,Float64}=(0.0, 0.0))
+        # NOTE: deprecated TwoDGrid path (issue #43); `wind` accepted for signature compatibility
+        # with the MeshGrids method but unused here (this path deposits additively at order 1).
+        # NOTE: TwoDGrid is deprecated (issue #43); higher-order B-spline deposition is only
+        # supported on the live MeshGrids/CartesianGrid path. `spline` is accepted for dispatch
+        # compatibility but ignored here — this path always deposits at order 1 (CIC).
         #u[4], u[5] are the x and y positions of the particle
         #index_positions, weights = PIC.compute_weights_and_index(G, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5])
         weights_and_index = PIC.compute_weights_and_index_mininal(G, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5])
@@ -68,10 +72,10 @@ function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::TwoDGr
         nothing
 end
 
-function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::MeshGrids, periodic_boundary::Bool)
-        
+function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::MeshGrids, periodic_boundary::Bool, spline::Val{P}=Val(1), wind::Tuple{Float64,Float64}=(0.0, 0.0)) where {P}
+
         #u[4], u[5] are the x and y positions of the particle. For the CartesianGrid2D these are cooridnates relative to the particle node
-        weights_and_index = PIC.compute_weights_and_index_mininal(PI.position_ij, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5])
+        weights_and_index = PIC.compute_weights_and_index_mininal(PI.position_ij, PI.ODEIntegrator.u[4], PI.ODEIntegrator.u[5], spline)
         # @info PI.position_ij, weights_and_index
 
         #ui[1:2] .= PI.position_xy
@@ -79,8 +83,9 @@ function ParticleToNode!(PI::AbstractParticleInstance, S::StateTypeL1, G::MeshGr
         u_state = GetParticleEnergyMomentum(PI.ODEIntegrator.u)
         #@show u_state
 
-        #PIC.push_to_grid!(S, u_state , index_positions,  weights, G.Nx, G.Ny , periodic_boundary)
-        PIC.push_to_grid!(S, u_state, weights_and_index, G.stats.Nx, G.stats.Ny)
+        # `wind` is the local (u,v) at the particle; it drives the wind-sea-aware merge! contest
+        # at each stencil node (so opposing groups do not additively cancel their momentum).
+        PIC.push_to_grid!(S, u_state, weights_and_index, G.stats.Nx, G.stats.Ny, wind)
         nothing
 end
 
@@ -185,9 +190,11 @@ function advance!(PI::AbstractParticleInstance,
                         DT::Float64, 
                         log_energy_maximum::Float64,
                         wind_min_squared::Float64,
-                        periodic_boundary::Bool, 
+                        periodic_boundary::Bool,
                         default_particle::PP,
-                        ) where {PP<:Union{ParticleDefaults,Nothing},FF<:Union{ForcingCollection,ForcingData,NamedTuple{(:u, :v)},Tuple{Float64,Float64}}}
+                        spline::Val{P}=Val(1),
+                        windsea_merge::Bool=false,
+                        ) where {PP<:Union{ParticleDefaults,Nothing},FF<:Union{ForcingCollection,ForcingData,NamedTuple{(:u, :v)},Tuple{Float64,Float64}},P}
         #@show PI.position_ij
 
         #if ~PI.boundary # if point is not a 
@@ -280,8 +287,11 @@ function advance!(PI::AbstractParticleInstance,
         end
 
         #if PI.ODEIntegrator.u[1] > -13.0 #ODEs.log_energy_minimum # the minimum enerçy is distributed to 4 neighbouring particles
-        if PI.on 
-                ParticleToNode!(PI, S, Grid, periodic_boundary)
+        if PI.on
+                # windsea_merge=true forwards the local wind so the deposit runs the wind-sea
+                # merge! contest; false forwards zero wind, for which merge! == additive deposit.
+                merge_wind = windsea_merge ? winds_i_local : (0.0, 0.0)
+                ParticleToNode!(PI, S, Grid, periodic_boundary, spline, merge_wind)
         end
 
         return PI
@@ -318,11 +328,29 @@ function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
 
         # minimal_state[1] is the minimal Energy
         # minimal_state[2] is the minimal momentum squared
+        #
+        # Reconstruction floor on |m|. ODEs.m_amp_minimum is the absolute crash floor
+        # (guards the c = m·e/(2|m|²) division, #63). When ODEs.windsea_alpha > 0 the floor
+        # is raised to a local, wind-sea-aware level: α · |m| of a fully developed PM sea at
+        # the local wind speed (FetchRelations.windsea_momentum_PM ∝ U³). This discards the
+        # tiny, ill-defined net momentum that drives the #64 remesh limit cycle at wind/calm
+        # interfaces, while scaling with the wind so it never over-deactivates an energetic
+        # wind sea. α is tunable (PM is fully developed → an upper bound, so α is small).
+        m_amp_min = ODEs.windsea_alpha > 0 ?
+                max(ODEs.m_amp_minimum, ODEs.windsea_alpha * FetchRelations.windsea_momentum_PM(sqrt(wind_speed_squared))) :
+                ODEs.m_amp_minimum
+        m_amp    = speed(u_state[2], u_state[3])
+
         if ~PI.boundary & (u_state[1] >= minimal_state[1]) & (speed_square(u_state[1], u_state[2]) >= minimal_state[2])
-                # interior nodes: convert node state to particle values and push to ODEIntegrator
-                ui = GetVariablesAtVertex(u_state, xy[1], xy[2])
-                reset_PI_ut!(PI, ui, last_t; dt_init=ODEs.dt)
-                PI.on = true
+                if m_amp < m_amp_min
+                        # M3: zero-net-momentum — deactivate; wind branch below will re-seed if winds are present
+                        PI.on = false
+                else
+                        # interior nodes: convert node state to particle values and push to ODEIntegrator
+                        ui = GetVariablesAtVertex(u_state, xy[1], xy[2], m_amp_min=m_amp_min)
+                        reset_PI_ut!(PI, ui, last_t; dt_init=ODEs.dt)
+                        PI.on = true
+                end
 
         elseif ~PI.boundary & (wind_speed_squared >= ODEs.wind_min_squared)
                 # local wind is strong enough to reset from default particle
@@ -337,9 +365,14 @@ function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
                 PI.on = true
 
         elseif (u_state[1] >= minimal_state[1])
-                ui = GetVariablesAtVertex(u_state, xy[1], xy[2])
-                reset_PI_ut!(PI, ui, last_t; dt_init=ODEs.dt)
-                PI.on = true
+                if m_amp < m_amp_min
+                        # M3: zero-net-momentum with no wind to re-seed — deactivate
+                        PI.on = false
+                else
+                        ui = GetVariablesAtVertex(u_state, xy[1], xy[2], m_amp_min=m_amp_min)
+                        reset_PI_ut!(PI, ui, last_t; dt_init=ODEs.dt)
+                        PI.on = true
+                end
 
         else
                 PI.on = false
