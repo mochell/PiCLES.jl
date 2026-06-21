@@ -220,13 +220,13 @@ for case in case_list
 
         # non periodic boundary
         wave_simulation = Simulation(wave_model, Δt=DT, stop_time=T)
-        initialize_simulation!(wave_simulation)
+        initialize_simulation!(wave_simulation);
         run!(wave_simulation, store=false, cash_store=true, debug=false);
 
         # periodic boundary
         wave_model.periodic_boundary    = true
         wave_simulation_periodic        = Simulation(wave_model, Δt=DT, stop_time=T)
-        initialize_simulation!(wave_simulation_periodic)
+        initialize_simulation!(wave_simulation_periodic);
         run!(wave_simulation_periodic, store=false, cash_store=true, debug=false);
         #Plotting.plot_results(wave_simulation_periodic, title="$u10 m/s, periodic=" * string(wave_model.periodic_boundary))
 
