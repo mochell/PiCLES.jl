@@ -217,7 +217,11 @@ function WaveGrowth2D(; grid::GG,
     periodic_boundary=true,
     boundary_type="same", # or "minimal", "same", default is same, only used if periodic_boundary is false
     CBsets=nothing,
-    spline_order::Int=1,  # B-spline deposition order: 1=CIC (default), 2=TSC, 3=cubic
+    spline_order::Int=3,  # B-spline particle→grid deposition order: 1=CIC, 2=TSC, 3=cubic (default).
+                          # Order 1/2 imprint a 4-fold grid-axis "cross" on a symmetric TC eye
+                          # (issue #59); cubic (3) restores axisymmetry. Auto-falls back to 1 on
+                          # tripolar grids (higher-order seam remap unsupported). Verify a pure-
+                          # propagation ring stays circular if you change this.
     windsea_merge::Bool=false,  # false = additive deposition (default); true = wind-sea-favoured merge! (Hanson&Phillips 2001)
     movie=false) where {PP<:Union{ParticleDefaults2D,String},GG<:AbstractGrid}
 
@@ -229,9 +233,10 @@ function WaveGrowth2D(; grid::GG,
         error("spline_order must be 1, 2, or 3 (got $spline_order)")
     end
     # Higher-order deposition is not yet supported on tripolar grids (multi-point seam remap is a
-    # separate task); guard rather than silently deposit at the wrong order.
+    # separate task); fall back to CIC there rather than error, so the default (3) works anywhere.
     if spline_order > 1 && typeof(grid) <: MeshGrids && occursin("Tripolar", string(nameof(typeof(grid.stats.Ny))))
-        error("spline_order > 1 is not yet supported on tripolar grids; use spline_order=1.")
+        @warn "spline_order > 1 is not yet supported on tripolar grids; falling back to spline_order = 1."
+        spline_order = 1
     end
 
     # initialize state {SharedArray} given grid and layers

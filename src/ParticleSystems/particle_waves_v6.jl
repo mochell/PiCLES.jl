@@ -126,8 +126,21 @@ $(DocStringExtensions.FIELDS)
     wind_min_squared::Float64 = 4.0
     "minimum momentum amplitude for vertex reconstruction (crash floor); below this threshold the direction is ill-defined"
     m_amp_minimum::Float64 = 1e-6
-    "wind-sea scaling of the reconstruction floor: local threshold = max(m_amp_minimum, windsea_alpha · |m|_ws,PM(U_local)). 0 disables the local scaling (constant m_amp_minimum)."
-    windsea_alpha::Float64 = 0.0
+    """
+    Wind-sea-scaled reconstruction floor: local threshold =
+    max(m_amp_minimum, α_eff · |m|_ws,PM(U_local)), with α_eff = windsea_alpha · min(1, dt/10min)
+    automatically dt-scaled (bounds erosion at small dt; see `mapping_2D`). |m|_ws,PM is the
+    fully-developed Pierson–Moskowitz wind-sea momentum (∝ U³), so the floor scales with the
+    local wind and never over-deactivates an energetic sea; in calm regions it falls back to
+    `m_amp_minimum` (swell is never discarded).
+
+    This damps the remesh limit cycle at wind/calm interfaces and the rotating TC eyewall
+    (energy-conserving for a resolved eyewall). DEFAULT ≈0.005 — the validated stable-TC value
+    (use with spline_order=3 and a resolved eyewall, dx ≲ Rmax/20, wave Courant C_cg = c_g·dt/dx
+    ≈ 2–5). Set 0 to disable. CAUTION: on an UNDER-resolved eyewall the floor can collapse the
+    storm — resolve the eyewall first. See analysis/stability FINDINGS_eyewall_stability_courant.
+    """
+    windsea_alpha::Float64 = 0.005
     "solver method for ODE system"
     #alternatives
     #Rosenbrock23(), AutoVern7(Rodas4()) ,AutoTsit5(Rosenbrock23()) , Tsit5()
