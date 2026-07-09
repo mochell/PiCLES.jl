@@ -37,7 +37,7 @@ using PiCLES.Plotting.movie: init_movie_2D_box_plot
 #sign.(rand(-1:1, 10, 10))
 
 
-save_path = "plots/tests/T04_2D_growing_decaying_winds/"
+save_path = "PiCLES/plots/tests/T04_2D_growing_decaying_winds_P2/"
 mkpath(save_path)
 
 ##### basic parameters
@@ -92,7 +92,7 @@ ODE_settings = PW.ODESettings(
 function make_reg_test(wave_model, save_path; plot_name="dummy", N=36, axline=0)
 
     ### build Simulation
-    wave_simulation = Simulation(wave_model, Δt=DT, stop_time=1hour)#1hours)
+    wave_simulation = Simulation(wave_model, Δt=DT, stop_time=5hour)#1hours)
     initialize_simulation!(wave_simulation)
 
     # run simulation
@@ -116,7 +116,7 @@ end
 
 
 # % half domain tests
-gridmesh = [(i, j) for i in [-10,10], j in  [0]]
+gridmesh = [(i, j) for i in [-30,-20,-10,10], j in  [0]]
 #gridmesh = [(i, j) for i in [10], j in [0]]
 
 #for I in CartesianIndices(gridmesh)
@@ -149,9 +149,10 @@ for (U10, V10) in gridmesh
         boundary_type="same",
         minimal_particle=FetchRelations.MinimalParticle(U10, V10, DT), #
         # minimal_state=FetchRelations.MinimalState(2, 2, DT) * 1,
+        spline_order=2,
         movie=true)
 
-    make_reg_test(wave_model, save_path, plot_name="T02_2D_growing_U" * string(U10) * "_V" * string(V10), N=40, axline=x0/1e3)
+    make_reg_test(wave_model, save_path, plot_name="T02_2D_growing_U" * string(U10) * "_V" * string(V10), N=48*6, axline=x0/1e3)
 end
 
 # %%
@@ -186,6 +187,7 @@ for (U10, V10) in gridmesh
         boundary_type="same",
         minimal_particle=FetchRelations.MinimalParticle(U10, V10, DT), #
         # minimal_state=FetchRelations.MinimalState(2, 2, DT) * 1,
+        spline_order=2,
         movie=true)
 
     make_reg_test(wave_model, save_path, plot_name="T02_2D_decaying_U" * string(U10) * "_V" * string(V10), N=60, axline=x0/1e3)
@@ -223,6 +225,7 @@ for (U10, V10) in gridmesh
         boundary_type="same",
         minimal_particle=FetchRelations.MinimalParticle(U10, V10, DT), #
         # minimal_state=FetchRelations.MinimalState(2, 2, DT) * 1,
+        spline_order=2,
         movie=true)
 
     make_reg_test(wave_model, save_path, plot_name="T02_2D_divergence_U" * string(U10) * "_V" * string(V10), N=100, axline=x0/1e3)

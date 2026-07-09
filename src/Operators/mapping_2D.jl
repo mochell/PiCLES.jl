@@ -336,8 +336,14 @@ function remesh!(PI::ParticleInstance2D, S::StateTypeL1,
         # tiny, ill-defined net momentum that drives the #64 remesh limit cycle at wind/calm
         # interfaces, while scaling with the wind so it never over-deactivates an energetic
         # wind sea. α is tunable (PM is fully developed → an upper bound, so α is small).
-        m_amp_min = ODEs.windsea_alpha > 0 ?
-                max(ODEs.m_amp_minimum, ODEs.windsea_alpha * FetchRelations.windsea_momentum_PM(sqrt(wind_speed_squared))) :
+        # dt-scaled wind-sea floor: the momentum eroded per unit time ∝ α/dt, so a constant
+        # α drains the field at small dt (collapse). Scaling α ∝ min(1, dt/dt_ref) with
+        # dt_ref = 10 min (the validated sweet spot) bounds the erosion and prevents the
+        # small-dt collapse, making `windsea_alpha` safe to leave on by default. See the
+        # eyewall-stability FINDINGS (analysis/stability) for the α/dt collapse calibration.
+        α_eff = ODEs.windsea_alpha * min(1.0, ODEs.timestep / 600.0)
+        m_amp_min = α_eff > 0 ?
+                max(ODEs.m_amp_minimum, α_eff * FetchRelations.windsea_momentum_PM(sqrt(wind_speed_squared))) :
                 ODEs.m_amp_minimum
         m_amp    = speed(u_state[2], u_state[3])
 
